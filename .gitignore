@@ -1,0 +1,21 @@
+# Node
+node_modules
+.pnpm-store
+.next
+out
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Logs
+*.log
