@@ -1,28 +1,27 @@
 <div align="center">
 <svg xmlns="http://www.w3.org/2000/svg" width="600" height="140" viewBox="0 0 600 140">
   <defs>
-    <linearGradient id="toxic-shimmer" x1="-100%" y1="0%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#051105"/>
-      <stop offset="40%" stop-color="#39ff14"/>
-      <stop offset="60%" stop-color="#39ff14"/>
-      <stop offset="100%" stop-color="#051105"/>
-      <animate attributeName="x1" values="-100%;0%;100%" dur="3s" repeatCount="indefinite" />
-      <animate attributeName="x2" values="0%;100%;200%" dur="3s" repeatCount="indefinite" />
+    <linearGradient id="toxic" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#39ff14" />
+      <stop offset="60%" stop-color="#39ff14" />
+      <stop offset="100%" stop-color="#00cc00" />
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur1"/>
+      <feGaussianBlur stdDeviation="8" result="blur2"/>
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
   </defs>
   <text x="50%" y="38%" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="52"
-        fill="url(#toxic-shimmer)" filter="url(#glow)">RESAMPLE</text>
-  <text x="50%" y="72%" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="52"
-        fill="url(#toxic-shimmer)" filter="url(#glow)">LAB</text>
+        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="56"
+        fill="url(#toxic)" filter="url(#glow)">RESAMPLE</text>
+  <text x="50%" y="74%" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="56"
+        fill="url(#toxic)" filter="url(#glow)">LAB</text>
 </svg>
 
 <p>
@@ -31,8 +30,15 @@
   <a href="LICENSE">MIT license</a>
 </p>
 
-<p>
+<p align="center">
   <sub>TypeScript · Next.js · Web Audio · deterministic DSP · static deploy</sub>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-39ff14?logo=opensourceinitiative&logoColor=white" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Web_Audio-FF6B6B?logo=audacity&logoColor=white" alt="Web Audio" />
 </p>
 </div>
 
