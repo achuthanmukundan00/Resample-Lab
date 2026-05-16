@@ -780,7 +780,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
 
 // ---------- Impact / Riser Mutator ----------
 
-function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function impactRiserMutator(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
@@ -788,6 +788,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     const stereo = ensureStereo(src.channels);
 
     // 1. Reversed riser — reverse + fade-in + saturation + reverb
+    onProgress?.(0.15, "Building riser…");
     const riserDur = Math.min(4 + chaos * 8, Math.floor(stereo[0].length / sr));
     const riserSamples = Math.floor(sr * riserDur);
     let riser = T.reverse(stereo.map((ch) => ch.slice(0, riserSamples)));
@@ -808,6 +809,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     );
 
     // 2. Pitch-dropped impact — resample + drive + highpass + reverb tail
+    onProgress?.(0.30, "Pitching impact…");
     const si = -24 - Math.floor(chaos * 12);
     let impact = T.resampleChannels(stereo, 1 / 2 ** (si / 12), stereo[0].length);
     impact = T.softClip(impact, 0.3 + chaos * 0.5);
@@ -825,7 +827,8 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
       )
     );
 
-    // 3. Transient smear — reverb convolution wash (cap to 5s input to avoid O(n²) explosion)
+    // 3. Transient smear — reverb convolution wash
+    onProgress?.(0.45, "Smearing transients…");
     const smearInput = T.capDuration(stereo, sr, 5);
     const reverbTime = 0.5 + chaos * 2.5;
     const irLen = Math.min(Math.floor(sr * reverbTime), smearInput[0].length);
@@ -837,10 +840,12 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
 
     const smearCh = smearInput.map((ch) => {
       const conv = new Float32Array(ch.length);
+      const progressStep = Math.max(1, Math.floor(ch.length / 10));
       for (let i = 0; i < ch.length; i++) {
         let sum = 0;
         for (let j = 0; j < irLen && j <= i; j++) sum += ch[i - j] * ir[j];
         conv[i] = sum;
+        if (i % progressStep === 0) onProgress?.(0.45 + (i / ch.length) * 0.20, "Convolving reverb…");
       }
       return conv;
     });
@@ -863,6 +868,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     );
 
     // 4. Filter sweep riser + impact — longer build with distortion
+    onProgress?.(0.70, "Sweeping filter riser…");
     const riseLen = Math.min(Math.floor(sr * (3 + chaos * 6)), stereo[0].length);
     let sweepRiser = T.reverse(stereo.map((ch) => ch.slice(0, riseLen)));
     sweepRiser = T.filterSweep(sweepRiser, sr, 50, 4000 + chaos * 8000);

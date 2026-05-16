@@ -56,16 +56,17 @@ export default function Home() {
     const url = URL.createObjectURL(zipBlob)
     const a = document.createElement('a')
     a.href = url
-    const name =
+    const base =
       files.length === 1
         ? files[0].name.replace(/\.[^.]+$/, '')
         : `resample-pack-${Date.now()}`
-    a.download = `${name}.zip`
+    const chaosInt = Math.round(chaos * 100)
+    a.download = `${base}__${selectedPreset}__chaos${chaosInt}.zip`
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-  }, [zipBlob, files])
+  }, [zipBlob, files, selectedPreset, chaos])
 
   const handleSubmit = useCallback(async () => {
     if (files.length === 0 || !selectedPreset || isProcessing) return

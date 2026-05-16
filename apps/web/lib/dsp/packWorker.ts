@@ -54,12 +54,6 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         samples: manifestSamples,
       };
 
-      const manifestJson = JSON.stringify(manifest, null, 2);
-      zipEntries.push({
-        name: "manifest.json",
-        data: new TextEncoder().encode(manifestJson),
-      });
-
       reportProgress(0.95, "Compressing…");
 
       // Build ZIP
