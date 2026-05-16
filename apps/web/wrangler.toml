@@ -5,6 +5,10 @@
 #   localhost -> http://localhost:8000
 #   deployed  -> https://resample-lab-api.onrender.com
 #
+# Subpath deployment: set NEXT_PUBLIC_BASE_PATH=/rlab in Cloudflare
+# dashboard env vars (or pass inline when building) to serve under
+# watchyourtemper.com/rlab . See docs/deploy-cloudflare-subroute.md
+#
 # Deploy:
 #   npx wrangler pages deploy out --branch main
 

@@ -10,6 +10,7 @@ import PackStatusCard from '@/components/PackStatusCard'
 import ManifestPreview from '@/components/ManifestPreview'
 import Footer from '@/components/Footer'
 import { PRESETS } from '@/lib/presets'
+import { assetPath } from '@/lib/paths'
 import { AudioBufferData, PackManifest } from '@/lib/dsp/types'
 import { Capabilities } from '@/lib/types'
 
@@ -158,7 +159,7 @@ export default function Home() {
           <div className="flex items-start sm:items-center gap-4 flex-wrap">
             <a href="https://watchyourtemper.com" target="_blank" rel="noopener noreferrer">
               <img
-                src="/wyt-logo.png"
+                src={assetPath('/wyt-logo.png')}
                 alt="watchyourtemper"
                 className="h-20 w-20 sm:h-40 sm:w-40 object-contain opacity-85 shrink-0 hover:opacity-100 transition-opacity"
               />
