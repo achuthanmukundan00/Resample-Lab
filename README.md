@@ -1,28 +1,5 @@
 <div align="center">
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="140" viewBox="0 0 600 140">
-  <defs>
-    <linearGradient id="toxic" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#39ff14" />
-      <stop offset="60%" stop-color="#39ff14" />
-      <stop offset="100%" stop-color="#00cc00" />
-    </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="3" result="blur1"/>
-      <feGaussianBlur stdDeviation="8" result="blur2"/>
-      <feMerge>
-        <feMergeNode in="blur2"/>
-        <feMergeNode in="blur1"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-  <text x="50%" y="38%" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="56"
-        fill="url(#toxic)" filter="url(#glow)">RESAMPLE</text>
-  <text x="50%" y="74%" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="56"
-        fill="url(#toxic)" filter="url(#glow)">LAB</text>
-</svg>
+  <img src="docs/assets/logo.svg" alt="RESAMPLE LAB" width="600" />
 
 <p>
   <a href="https://resample-lab.pages.dev">Live app</a> ·
