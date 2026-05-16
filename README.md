@@ -1,6 +1,5 @@
-<div align="center">
-  <img src="docs/assets/logo.svg" alt="RESAMPLE LAB" width="600" />
-
+# RESAMPLE LAB
+<div>
 <p>
   <a href="https://resample-lab.pages.dev">Live app</a> ·
   <a href="https://resample-lab.pages.dev/docs">Docs</a> ·
