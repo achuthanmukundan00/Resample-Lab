@@ -64,6 +64,16 @@ export const api = {
       throw new ApiError(detail, res.status)
     }
     const blob = await res.blob()
+    if (blob.size < 100) {
+      throw new ApiError(`Download returned unexpectedly small response (${blob.size} bytes)`, res.status)
+    }
+    const contentType = res.headers.get("content-type") || ""
+    if (!contentType.includes("zip") && !contentType.includes("octet-stream")) {
+      if (blob.size < 512) {
+        const text = await blob.text()
+        throw new ApiError(`Unexpected response: ${text.slice(0, 200)}`, res.status)
+      }
+    }
     const disposition = res.headers.get("content-disposition") || ""
     const match = disposition.match(/filename="?(.+?)"?$/)
     const filename = match?.[1] || `resample-lab-${packId.slice(0, 8)}.zip`

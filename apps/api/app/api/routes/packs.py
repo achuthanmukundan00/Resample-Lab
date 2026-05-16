@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import shutil
 import uuid
@@ -23,6 +24,8 @@ from app.schemas.pack import (
 )
 from app.services.pack_store import PackState, PackStatus, pack_store
 from app.settings import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["packs"])
 
@@ -77,14 +80,18 @@ def _validate_content_type(filename: str) -> bool:
 
 async def process_pack_in_background(pack_id: str, upload_dir: Path, preset: str, chaos: float, pack_name: str):
     """Run pack generation in background with phase-based progress and timeout."""
+    logger.info("Processing pack %s (preset=%s, chaos=%s)", pack_id, preset, chaos)
     try:
         pack_store.update(pack_id, status=PackStatus.PROCESSING, progress=0.01, message="Queued — processing will begin shortly")
 
         source_paths = sorted(upload_dir.iterdir())
+        logger.info("Pack %s sources: %s", pack_id, [p.name for p in source_paths])
 
         def progress_callback(pct: float, msg: str) -> None:
+            logger.debug("Pack %s progress: %.2f — %s", pack_id, pct, msg)
             pack_store.update(pack_id, progress=pct, message=msg)
 
+        logger.info("Pack %s running run_pack (timeout=%ss)", pack_id, settings.job_timeout)
         manifest = await asyncio.wait_for(
             asyncio.to_thread(
                 run_pack,
@@ -97,6 +104,7 @@ async def process_pack_in_background(pack_id: str, upload_dir: Path, preset: str
             ),
             timeout=settings.job_timeout,
         )
+        logger.info("Pack %s completed successfully", pack_id)
         pack_store.update(
             pack_id,
             status=PackStatus.COMPLETED,
@@ -106,6 +114,7 @@ async def process_pack_in_background(pack_id: str, upload_dir: Path, preset: str
             zip_path=manifest.get("zip_path"),
         )
     except asyncio.TimeoutError:
+        logger.error("Pack %s timed out after %ss", pack_id, settings.job_timeout)
         pack_store.update(
             pack_id,
             status=PackStatus.FAILED,
@@ -113,6 +122,7 @@ async def process_pack_in_background(pack_id: str, upload_dir: Path, preset: str
             message="Pack generation timed out",
         )
     except Exception as e:
+        logger.exception("Pack %s failed with exception", pack_id)
         pack_store.update(
             pack_id,
             status=PackStatus.FAILED,
@@ -231,17 +241,19 @@ def get_pack(pack_id: str):
 
 
 @router.get("/packs/{pack_id}/download",
-            responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
+            responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 425: {"model": ErrorResponse}})
 def download_pack(pack_id: str):
     state = pack_store.get(pack_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Pack not found")
     if state.status == PackStatus.PROCESSING:
-        raise HTTPException(status_code=400, detail="Pack is still processing")
-    if state.status == PackStatus.FAILED:
-        raise HTTPException(status_code=400, detail=f"Pack generation failed: {state.error}")
+        raise HTTPException(status_code=425, detail="Pack is still processing — try again later")
     if state.status == PackStatus.QUEUED:
-        raise HTTPException(status_code=400, detail="Pack is queued")
+        raise HTTPException(status_code=425, detail="Pack is queued — try again later")
+    if state.status == PackStatus.FAILED:
+        raise HTTPException(status_code=409, detail=f"Pack generation failed: {state.error}")
+    if state.status == PackStatus.DELETED:
+        raise HTTPException(status_code=404, detail="Pack has been deleted")
 
     zip_path = state.zip_path
     if not zip_path or not Path(zip_path).exists():

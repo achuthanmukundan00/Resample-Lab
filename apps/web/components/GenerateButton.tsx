@@ -10,7 +10,7 @@ export default function GenerateButton({ disabled, isProcessing }: GenerateButto
     <button
       type="submit"
       disabled={disabled}
-      className={`w-full py-3 px-6 rounded-xl font-medium text-sm transition-all ${
+      className={`w-full py-3 px-6 rounded-lg font-medium text-sm transition-all ${
         disabled
           ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
           : 'bg-accent text-black hover:bg-accent-glow active:scale-[0.98] shadow-lg shadow-accent-dim/20'

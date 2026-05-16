@@ -61,7 +61,7 @@ export default function UploadDropzone({
       onDragOver={handleDrag}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
         isDragging
           ? 'border-accent bg-accent-dim/15'
           : 'border-zinc-700 hover:border-accent-dim bg-zinc-900/50'
