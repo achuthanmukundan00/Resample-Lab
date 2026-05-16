@@ -32,9 +32,9 @@
 ---
 
 <p align="center">
-  <video src="docs/assets/demo.webm" controls width="100%"></video>
-  <br/>
-  <sub>Demo video — generate locally via <code>node scripts/demo-recorder.mjs --record</code> (see "Demo recorder" below)</sub>
+  <video src="https://github.com/achuthanmukundan00/Resample-Lab/raw/main/docs/assets/demo.webm" controls width="100%">
+  Your browser does not support the video tag.
+ </video>
 </p>
 
 ---
