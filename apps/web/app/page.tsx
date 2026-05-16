@@ -79,13 +79,13 @@ export default function Home() {
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="space-y-2">
-          <div className="flex items-center gap-4">
+          <div className="flex items-start sm:items-center gap-4 flex-wrap">
             <img
               src="/wyt-logo.png"
               alt=""
-              className="h-40 w-40 object-contain opacity-85"
+              className="h-20 w-20 sm:h-40 sm:w-40 object-contain opacity-85 shrink-0"
             />
-            <h1 className="text-xl font-semibold tracking-tight">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight mt-2 sm:mt-0">
               <span className="text-foreground">Resample</span>
               <span className="text-accent">-Lab</span>
             </h1>
@@ -130,7 +130,7 @@ export default function Home() {
         </section>
 
         {/* Chaos + Format */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div>
             <ChaosSlider value={chaos} onChange={setChaos} />
           </div>
