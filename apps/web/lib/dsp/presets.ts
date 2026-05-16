@@ -810,8 +810,8 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
       )
     );
 
-    // 3. Transient smear — reverb convolution wash
-    const smearInput = T.capDuration(stereo, sr, DSP.MAX_OUTPUT_DURATION_S);
+    // 3. Transient smear — reverb convolution wash (cap to 5s input to avoid O(n²) explosion)
+    const smearInput = T.capDuration(stereo, sr, 5);
     const reverbTime = 0.5 + chaos * 2.5;
     const irLen = Math.min(Math.floor(sr * reverbTime), smearInput[0].length);
     const ir = new Float32Array(irLen);
