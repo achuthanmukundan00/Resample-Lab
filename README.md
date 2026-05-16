@@ -1,17 +1,29 @@
 <div align="center">
-<pre><em>
-    &#95;&#95;&#95;&#95;  &#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95;&#95; &#95;&#95;&#95;    &#95;&#95;&#95;&#95;&#95;&#95;  &#95;&#95;    &#95;&#95;&#95;&#95;&#95;&#95;
-   / &#95;&#95; \/ &#95;&#95;&#95;&#95;/ &#95;&#95;&#95;/   |  |  / / &#95;&#95; \/ /   / &#95;&#95;&#95;&#95;/
-  / /&#95;/ / &#95;&#95;/  \&#95;&#95; \/ /| |  | / / /&#95;/ / /   / &#95;&#95;/
- / &#95;, &#95;/ /&#95;&#95;&#95; &#95;&#95;&#95;/ / &#95;&#95;&#95; |  |/ / &#95;&#95;&#95;&#95;/ /&#95;&#95;&#95;/ /&#95;&#95;&#95;
-/&#95;/ |&#95;/&#95;&#95;&#95;&#95;&#95;//&#95;&#95;&#95;&#95;/&#95;/  |&#95;|&#95;&#95;&#95;&#95;/&#95;/   /&#95;&#95;&#95;&#95;&#95;/&#95;&#95;&#95;&#95;&#95;/
-
-    &#95;&#95;    &#95;&#95;&#95;    &#95;&#95;&#95;&#95;
-   / /   /   |  / &#95;&#95; )
-  / /   / /| | / &#95;&#95;  |
- / /&#95;&#95;&#95;/ &#95;&#95;&#95; |/ /&#95;/ /
-/&#95;&#95;&#95;&#95;&#95;/&#95;/  |&#95;/&#95;&#95;&#95;&#95;&#95;/
-</em></pre>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="140" viewBox="0 0 600 140">
+  <defs>
+    <linearGradient id="toxic-shimmer" x1="-100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#051105"/>
+      <stop offset="40%" stop-color="#39ff14"/>
+      <stop offset="60%" stop-color="#39ff14"/>
+      <stop offset="100%" stop-color="#051105"/>
+      <animate attributeName="x1" values="-100%;0%;100%" dur="3s" repeatCount="indefinite" />
+      <animate attributeName="x2" values="0%;100%;200%" dur="3s" repeatCount="indefinite" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <text x="50%" y="38%" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="52"
+        fill="url(#toxic-shimmer)" filter="url(#glow)">RESAMPLE</text>
+  <text x="50%" y="72%" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', Courier, monospace" font-weight="700" font-size="52"
+        fill="url(#toxic-shimmer)" filter="url(#glow)">LAB</text>
+</svg>
 
 <p>
   <a href="https://resample-lab.pages.dev">Live app</a> ·
@@ -38,6 +50,8 @@
 
 <p align="center">
   <video src="docs/assets/demo.webm" controls width="100%"></video>
+  <br/>
+  <sub>Demo video — generate locally via <code>node scripts/demo-recorder.mjs --record</code> (see "Demo recorder" below)</sub>
 </p>
 
 ---
@@ -61,6 +75,47 @@ npx wrangler pages deploy out --branch main
 ```
 
 > <sub>Or connect to Cloudflare Pages → build: `cd apps/web && pnpm install && pnpm build`, output: `apps/web/out`</sub>
+
+---
+
+## Developer Workflows
+
+### Run tests
+
+```bash
+npx tsx apps/web/lib/dsp/__tests__/dsp.test.ts
+```
+
+114+ DSP tests: transforms, finishing rack, tape, delays, reverbs, granular engine, stereo/mono compatibility, audio analysis.
+
+### Render audit (listen-test across all presets)
+
+```bash
+# Point at a directory of WAV files
+npx tsx scripts/render-dsp-corpus.ts --input ./my-samples
+
+# Custom output dir, chaos values, file limit
+npx tsx scripts/render-dsp-corpus.ts --input ./my-samples --output ./audit --chaos 0.0,0.5,1.0 --limit 3
+```
+
+Generates every preset × every file × 3 chaos levels × 4 length modes. Output goes to `.render-audit/` with `report.json` and `report.md`.
+
+### Demo recorder (Playwright)
+
+```bash
+# One-time setup
+pnpm add -D playwright
+npx playwright install
+
+# Terminal 1: start dev server
+pnpm dev
+
+# Terminal 2: smoke test or record
+node scripts/demo-recorder.mjs          # quick smoke test
+node scripts/demo-recorder.mjs --record  # record demo.webm
+```
+
+Requires `test.wav` at the repo root. The recorded video saves to `docs/assets/demo.webm`.
 
 ---
 
@@ -88,6 +143,7 @@ npx wrangler pages deploy out --branch main
 | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **8 DSP presets**     | Ambient pads, ghost reverses, granular shards, bitrot, pitch wreckage, loop extraction, impact risers, chaos pack |
 | **Chaos parameter**   | Single knob: _Clean → Weird → Broken → Illegal Texture_                                                           |
+| **Length modes**      | Short (15s), Medium (45s), Long (90s), Absurd (120s) — control output duration                                    |
 | **Fully local**       | Web Workers process audio in-browser. Works offline after first load                                              |
 | **Zero AI**           | All DSP is deterministic signal processing. No black boxes, no hallucinations                                     |
 | **Static deployment** | One `pnpm build` → static export that deploys anywhere                                                            |
@@ -102,6 +158,20 @@ npx wrangler pages deploy out --branch main
 | 0.33  | _Weird_             | Moderate — 12× stretch, noticeable artifacts, medium saturation    |
 | 0.66  | _Broken_            | Aggressive — 16× stretch, heavy degradation, wide modulation       |
 | 1.00  | **Illegal Texture** | Maximum — 20× stretch, full reverb, extreme bitcrush, unstable LFO |
+
+---
+
+## Length Modes
+
+| Mode     | Max Duration | Use Case                              |
+| :------- | :----------- | :------------------------------------ |
+| **Short**   | 15s          | Quick one-shots, tight loops          |
+| **Medium**  | 45s          | Versatile default for most material   |
+| **Long**    | 90s          | Extended pads, ambient tails          |
+| **Absurd**  | 120s         | Maximal drones, large file sizes      |
+
+> Each preset has a default mode tuned to its character. Override it in the UI.
+> **Absurd mode** can produce files over 20 MB each and large ZIP downloads.
 
 ---
 
@@ -132,10 +202,16 @@ Resample-Lab/
 │   ├── app/
 │   │   ├── page.tsx           # Main UI
 │   │   └── docs/page.tsx      # Full docs
-│   ├── components/            # React components
+│   ├── components/            # React components (ChaosSlider, LengthModeSelector, etc.)
 │   ├── lib/dsp/               # Core DSP engine
 │   │   ├── transforms.ts      # 35+ audio transforms
 │   │   ├── presets.ts         # 8 preset recipes
+│   │   ├── finish.ts          # Finishing rack (DC block, EQ, limiter)
+│   │   ├── tape.ts            # Tape emulation (wow, loss, head bump)
+│   │   ├── delay.ts           # Delay effects (mono, ping-pong, diffusion)
+│   │   ├── reverb.ts          # Reverb engines (dark, hall, metallic)
+│   │   ├── granular.ts        # Granular synthesis (cloud, freeze, swarm)
+│   │   ├── analysis.ts        # Audio analysis utilities (peak, RMS, clipping)
 │   │   ├── packWorker.ts      # Web Worker entry
 │   │   ├── wav.ts             # WAV encoding
 │   │   ├── zip.ts             # ZIP builder
@@ -166,14 +242,15 @@ Resample-Lab/
 
 ## Technical Limits
 
-| Limit               | Value                                |
-| :------------------ | :----------------------------------- |
-| Max files per pack  | 8                                    |
-| Max input duration  | 300s (5 min)                         |
-| Max output duration | 90s                                  |
-| Input formats       | WAV, AIFF, FLAC, MP3, M4A, OGG       |
-| Output format       | 48kHz · 16‑bit WAV                   |
-| Processing          | Single Web Worker, sync Float32Array |
+| Limit               | Value                                         |
+| :------------------ | :-------------------------------------------- |
+| Max files per pack  | 8                                             |
+| Max input duration  | 300s (5 min)                                  |
+| Max output duration | 15–120 s (selectable via Length mode)         |
+| Input formats       | WAV, AIFF, FLAC, MP3, M4A, OGG                |
+| Output format       | 16‑bit WAV at source sample rate              |
+| Processing          | Single Web Worker, sync Float32Array          |
+| Tests               | 114+ (npx tsx apps/web/lib/dsp/__tests__/dsp.test.ts) |
 
 ---
 
