@@ -43,6 +43,9 @@ uploads/**/*.mp3
 tmp/
 temp/
 
+# Accidentally-committed test file
+/test.wav
+
 # IDE
 .idea/
 .vscode/
