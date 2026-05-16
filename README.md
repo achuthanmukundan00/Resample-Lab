@@ -1,5 +1,6 @@
-# RESAMPLE LAB
+
 <div>
+  # RESAMPLE LAB
 <p>
   <a href="https://resample-lab.pages.dev">Live app</a> ·
   <a href="https://resample-lab.pages.dev/docs">Docs</a> ·
