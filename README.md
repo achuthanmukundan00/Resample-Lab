@@ -1,5 +1,5 @@
 
-<div>
+<div align="center">
   <h1>RESAMPLE LAB</h1> 
 <p>
   <a href="https://resample-lab.pages.dev">Live app</a> ·
