@@ -83,7 +83,7 @@ export default function Home() {
             <img
               src="/wyt-logo.png"
               alt=""
-              className="h-20 w-20 object-contain opacity-85"
+              className="h-40 w-40 object-contain opacity-85"
             />
             <h1 className="text-xl font-semibold tracking-tight">
               <span className="text-foreground">Resample</span>
