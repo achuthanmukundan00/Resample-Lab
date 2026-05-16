@@ -1,16 +1,8 @@
 import { Capabilities, PackCreateResponse, PackListResponse, PackStatusResponse } from "@/lib/types"
 
-// Static export — NEXT_PUBLIC_* env vars are inlined at build time and can't
-// be changed per-environment.  Detect the backend URL from the current hostname.
-function getApiBase(): string {
-  if (typeof window === "undefined") return "http://localhost:8000"
-  const host = window.location.hostname
-  if (host === "localhost" || host === "127.0.0.1") return "http://localhost:8000"
-  // Production backend
-  return "https://resample-lab-api.onrender.com"
-}
-
-const API_BASE = getApiBase()
+// Static export — no backend. This API client is unused in the local-only flow.
+// Calls will fail and callers should handle errors gracefully.
+const API_BASE = typeof window === "undefined" ? "" : window.location.origin
 
 class ApiError extends Error {
   constructor(message: string, public status: number) {
