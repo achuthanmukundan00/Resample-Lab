@@ -1,80 +1,46 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/achuthanmukundan00/Resample-Lab/main/apps/web/public/wyt-logo.png">
-  <img alt="Resample-Lab" src="https://raw.githubusercontent.com/achuthanmukundan00/Resample-Lab/main/apps/web/public/wyt-logo.png" width="80" height="80">
-</picture>
+<p align="center">
+  <img src="docs/assets/logo-ascii.svg" alt="RESAMPLE LAB" width="680" />
+</p>
 
-# Resample-Lab
+<p align="center">
+  <a href="https://resample-lab.pages.dev"><img src="https://img.shields.io/badge/🚀_LIVE-resample--lab.pages.dev-39ff14?style=for-the-badge&logo=cloudflare&logoColor=fff&labelColor=111" alt="Live Site" /></a>
+  <a href="https://resample-lab.pages.dev/docs"><img src="https://img.shields.io/badge/📖_DOCS-read_now-00ff41?style=for-the-badge&logo=readthedocs&logoColor=fff&labelColor=111" alt="Docs" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-32cd32?style=for-the-badge&logo=opensourceinitiative&logoColor=fff&labelColor=111" alt="License: MIT" /></a>
+</p>
 
-**Non-AI audio mutation lab. Turn any sound into a sample pack — entirely in your browser.**
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=fff&labelColor=222" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js&logoColor=fff&labelColor=222" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Web_Audio-39ff14?style=flat-square&logo=webaudio&logoColor=fff&labelColor=222" alt="Web Audio" />
+  <img src="https://img.shields.io/badge/DSP-8_presets-32cd32?style=flat-square&labelColor=222" alt="8 Presets" />
+  <img src="https://img.shields.io/badge/AI-NONE-39ff14?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2Ij48cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHJ4PSIxIiBmaWxsPSIjMzlmZjE0Ii8+PC9zdmc+&labelColor=222" alt="Zero AI" />
+  <img src="https://img.shields.io/badge/PRs-welcome-00ff41?style=flat-square&logo=github&logoColor=fff&labelColor=222" alt="PRs Welcome" />
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=fff&labelColor=222" alt="Python" />
+  <img src="https://img.shields.io/badge/pnpm-F69220?style=flat-square&logo=pnpm&logoColor=fff&labelColor=222" alt="pnpm" />
+  <img src="https://img.shields.io/badge/Cloudflare-F6821F?style=flat-square&logo=cloudflare&logoColor=fff&labelColor=222" alt="Cloudflare" />
+</p>
 
-Upload audio, pick a DSP preset, dial in the chaos. Your browser runs the processing — WSOLA time-stretch, granular synthesis, biquad filters, convolution reverb, tape wow, bitcrushing, Haas-effect stereo widening, and more. Nothing is uploaded. No API calls. No GPU needed. Just Float32Array math and Web Workers.
+<br />
 
-> **[→ Try it live](https://resample-lab.pages.dev)** &nbsp;|&nbsp; [→ Full documentation](https://resample-lab.pages.dev/docs) &nbsp;|&nbsp; [→ Contributing](CONTRIBUTING.md)
+<p align="center">
+  <em><b>Upload audio. Pick a preset. Dial in the chaos. Download your sample pack.</b></em>
+</p>
 
----
+<p align="center">
+  <em>Stretched ambiences · Ghost reverses · Granular shards · Bitrot degradation · Pitch wreckage · Loop extraction · Impact risers · Chaos pack</em>
+</p>
 
-## Features
-
-- **8 distinct DSP presets** — ambient pads, ghost reverses, granular shards, bitrot degradation, pitch wreckage, loop extraction, impact risers, and the chaos pack (curated multi-recipe)
-- **Chaos parameter** — a single knob from *Clean* → *Weird* → *Broken* → *Illegal Texture*, modulating every parameter across the entire DSP chain
-- **Fully local** — Web Workers process Float32Array audio in-browser. Your source files never touch a server. Works offline after first load.
-- **Watchyourtemper® character chain** — every ambient, ghost, and riser output runs through Haas-effect stereo widening + a warm chain (20 Hz highpass, 60 Hz lowpass, soft clip saturation)
-- **Zero AI** — all DSP is deterministic signal processing. No black boxes, no hallucinations, no "we'll fix it in the model."
-- **Static deployment** — one `pnpm build` produces a static export that deploys anywhere (Cloudflare Pages, Vercel, S3, etc.)
-
----
-
-## Presets
-
-| Preset | Outputs | What it does |
-|--------|---------|-------------|
-| **Ambient Stretch Lab** | 5 | WSOLA time-stretch (8–20×), Schroeder reverb, tape wow, lowpass filter sweep, reverse smear with delay, ghost pads with stereo widening, reverse reverb wash |
-| **Ghost Reverse Lab** | 4 | Reverse tails with feedback delay, bandpass-filtered ghost hits with reverb, highpass pre-echoes with tape wow, distorted reverse pre-impacts |
-| **Granular Shards** | 10 | Slice/shuffle/reassemble at 4 window sizes (40–200ms), pitch-shifted clouds (±24 semitones), bitcrushed fragments, reverb throws, stutter repeats, noise-layered grains, speed variants |
-| **Bitrot Dirt** | 4 | Multi-stage downsample (2–14×), bitcrush (2–8 bit), noise layering, tape wow/flutter, bandpass filtering, saturation, degraded loop extraction with full degrade chain |
-| **Pitch Wreckage** | 4 | Octave-down resample (–12 to –24 st) with saturation, octave-up bandpass (+12 to +24 st), unstable pitch drift (LFO + noise modulation), dual-layer ±18 st mix with distortion |
-| **Loop Extractor** | 4 | Heuristic candidate finder using energy analysis + boundary correlation scoring, crossfade smoothing, repeat-to-duration, with clean/degraded/ghost/driven variants |
-| **Impact / Riser Mutator** | 4 | Reversed risers with filter sweep, pitch-dropped impacts (–24 to –36 st), transient smear via convolution reverb, long filter sweep risers with delay |
-| **Chaos Pack** | 7 | Curated multi-recipe: takes the most interesting output from each preset and combines them — maximum entropy in one ZIP |
+<br />
 
 ---
 
-## Chaos Parameter
-
-The chaos knob is a single 0–1 float that modulates every parameter in the DSP chain simultaneously:
-
-| Value | Label | Behavior |
-|-------|-------|----------|
-| 0.00 | Clean | Subtle processing: 8× stretch, light reverb, minimal drive |
-| 0.33 | Weird | Moderate: 12× stretch, noticeable artifacts, medium saturation |
-| 0.66 | Broken | Aggressive: 16× stretch, heavy degradation, wide modulation |
-| 1.00 | Illegal Texture | Maximum: 20× stretch, full reverb, extreme bitcrush/downsample, unstable LFO |
-
-Internally, chaos is applied as `baseValue + chaos * range` across stretch ratios, filter cutoffs, feedback amounts, reverb decay times, drive levels, bit depths, downsampling factors, pitch ranges, and modulation depths. Each preset also seeds a deterministic RNG from the source filename + chaos value for reproducible grain ordering and stochastic variation.
+<p align="center">
+  <video src="docs/assets/demo.webm" controls width="100%"></video>
+</p>
 
 ---
 
-## DSP Techniques
-
-All processing runs in a Web Worker using raw `Float32Array` buffers — no AudioContext processing, no WebAudio nodes, no WASM dependencies:
-
-| Technique | Implementation |
-|-----------|---------------|
-| **WSOLA Time-Stretch** | Overlap-add with Hann windowing, adaptive hop sizes, linear interpolation at extreme ratios |
-| **Biquad Filters** | Direct-form II transposed: lowpass, highpass, bandpass with configurable Q |
-| **Schroeder Reverb** | 4 parallel comb filters (31/37/43/53 ms) + 2 cascaded all-pass sections |
-| **Convolution Reverb** | O(n·k) naive convolution with exponential-decay noise IR, wet/dry mix (capped to 5s input for performance) |
-| **Granular Synthesis** | Slice at 4 window sizes (40/80/120/200ms), shuffle with LCG PRNG, per-grain pitch shift via linear resample |
-| **Tape Wow/Flutter** | Sinusoidal + multi-harmonic LFO modulating a fractional delay line with linear interpolation |
-| **Downsample + Bitcrush** | Pre-filter with lowpass at Nyquist/factor, then zero-order-hold, then uniform quantization at N-bit resolution |
-| **Haas Effect** | Random per-channel delay (1–12 ms) for precedence-effect stereo widening |
-| **Warm Chain** | Highpass (20 Hz) → lowpass (60 Hz) → soft clip (tanh saturation) → normalize (–1 dBFS) |
-| **Loop Detection** | Sliding-window energy analysis, boundary correlation scoring, non-overlapping candidate selection with fallback |
-| **DC Blocking** | Single-pole IIR highpass at 30 Hz cutoff |
-
----
-
-## Quickstart
+## ⚡ Quickstart
 
 ```bash
 git clone https://github.com/achuthanmukundan00/Resample-Lab.git
@@ -85,80 +51,132 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000). No backend. No API keys. No database.
 
-### Build for production
+### ☁️ One-command deploy
 
 ```bash
-pnpm build    # outputs to out/
-pnpm start    # serves the static export locally
-```
-
-### Deploy to Cloudflare Pages
-
-```bash
+pnpm build
 npx wrangler pages deploy out --branch main
 ```
 
-Or connect your GitHub repo to Cloudflare Pages dashboard — build command: `cd apps/web && pnpm install && pnpm build`, output directory: `apps/web/out`.
+> <sub>Or connect to Cloudflare Pages → build: `cd apps/web && pnpm install && pnpm build`, output: `apps/web/out`</sub>
 
 ---
 
-## Project Structure
+## 🧬 How it works
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────────┐    ┌───────────┐
+│  Upload  │ -> │  Preset  │ -> │  Web Worker  │ -> │ Download  │
+│  audio   │    │  select  │    │  DSP engine  │    │  ZIP pack │
+└──────────┘    └──────────┘    └──────────────┘    └───────────┘
+                      ↑
+               ┌──────┴──────┐
+               │ Chaos knob  │
+               │ 0.0 → 1.0  │
+               └─────────────┘
+```
+
+> *Everything runs in-browser via Web Workers. Float32Array math. No uploads. No API calls. No GPU needed.*
+
+---
+
+## 🎛️ Features
+
+|     |     |
+| --- | --- |
+| 🎹 **8 DSP presets** | Ambient pads, ghost reverses, granular shards, bitrot, pitch wreckage, loop extraction, impact risers, chaos pack |
+| 🌪️ **Chaos parameter** | Single knob: *Clean → Weird → Broken → Illegal Texture* |
+| 🔒 **Fully local** | Web Workers process audio in-browser. Works offline after first load |
+| 💀 **Zero AI** | All DSP is deterministic signal processing. No black boxes, no hallucinations |
+| ⚡ **Static deployment** | One `pnpm build` → static export that deploys anywhere |
+
+---
+
+## 🎚️ Chaos Parameter
+
+| Value | Label | Behavior |
+| :---: | :--- | :--- |
+| 0.00 | *Clean* | Subtle — 8× stretch, light reverb, minimal drive |
+| 0.33 | *Weird* | Moderate — 12× stretch, noticeable artifacts, medium saturation |
+| 0.66 | *Broken* | Aggressive — 16× stretch, heavy degradation, wide modulation |
+| 1.00 | **Illegal Texture** | Maximum — 20× stretch, full reverb, extreme bitcrush, unstable LFO |
+
+---
+
+## 🧪 DSP Techniques
+
+<sub>All processing runs in a Web Worker — raw `Float32Array` buffers, no AudioContext nodes, no WASM.</sub>
+
+| Technique | Implementation |
+| :--- | :--- |
+| WSOLA Time‑Stretch | Overlap-add with Hann windowing, adaptive hop sizes |
+| Biquad Filters | Direct-form II transposed — LP/HP/BP with configurable Q |
+| Schroeder Reverb | 4 comb filters (31/37/43/53ms) + 2 all-pass sections |
+| Convolution Reverb | O(n·k) with exponential-decay noise IR |
+| Granular Synthesis | 4 window sizes (40–200ms), LCG shuffle, per-grain pitch shift |
+| Tape Wow/Flutter | Multi‑harmonic LFO → fractional delay line |
+| Downsample + Bitcrush | Pre‑filter → zero-order-hold → N‑bit quantization |
+| Haas Effect | Per‑channel delay (1–12ms) stereo widening |
+| Warm Chain | HP20 → LP60 → soft clip (tanh) → normalize (−1dBFS) |
+| Loop Detection | Sliding-window energy analysis, boundary correlation scoring |
+
+---
+
+## 📂 Project Structure
 
 ```
 Resample-Lab/
 ├── apps/web/                  # Next.js static site + DSP engine
 │   ├── app/
-│   │   ├── page.tsx           # Main UI (upload, presets, chaos, download)
-│   │   └── docs/page.tsx      # Full documentation page
+│   │   ├── page.tsx           # Main UI
+│   │   └── docs/page.tsx      # Full docs
 │   ├── components/            # React components
-│   ├── lib/dsp/               # DSP engine (the core)
-│   │   ├── transforms.ts      # 35+ audio transform functions
-│   │   ├── presets.ts         # 8 preset recipes orchestrating transforms
-│   │   ├── packWorker.ts      # Web Worker entry point
+│   ├── lib/dsp/               # Core DSP engine
+│   │   ├── transforms.ts      # 35+ audio transforms
+│   │   ├── presets.ts         # 8 preset recipes
+│   │   ├── packWorker.ts      # Web Worker entry
 │   │   ├── wav.ts             # WAV encoding
-│   │   ├── zip.ts             # ZIP building
+│   │   ├── zip.ts             # ZIP builder
 │   │   ├── constants.ts       # Centralized limits
 │   │   └── types.ts           # Shared types
 │   └── public/                # Static assets
-├── docs/                      # Operational docs
-├── examples/                  # Example assets
+├── docs/                      # Operational docs & assets
+├── examples/                  # Example audio
+├── infra/                     # Docker compose
 └── CONTRIBUTING.md
 ```
 
 ---
 
-## Output Structure
-
-Downloaded ZIPs are organized by category:
+## 📦 Outputs
 
 ```
 {source}__{preset}__chaos{nn}.zip
 └── samples/
-    ├── ambience/     # Ambient pads, washes, textures
-    ├── one-shot/     # Impacts, hits, transient-heavy sounds
-    ├── loop/         # Rhythmic/gated/extracted loops
-    ├── oddity/       # Degraded, wrecked, unstable artifacts
-    └── granular/     # Sliced, shuffled, pitch-shifted grains
+    ├── ambience/     · Ambient pads, washes, textures
+    ├── one-shot/     · Impacts, hits, transients
+    ├── loop/         · Rhythmic, gated, extracted loops
+    ├── oddity/       · Degraded, wrecked, unstable artifacts
+    └── granular/     · Sliced, shuffled, pitch-shifted grains
 ```
 
-No `manifest.json` in the zip — all metadata is displayed in the browser UI before download.
-
 ---
 
-## Technical Limits
+## 🔬 Technical Limits
 
 | Limit | Value |
-|-------|-------|
+| :--- | :--- |
 | Max files per pack | 8 |
-| Max duration per file | 300 s (5 min) |
-| Max output sample duration | 90 s |
-| Supported input formats | WAV, AIFF, FLAC, MP3, M4A, OGG |
-| Output format | 48 kHz, 16-bit WAV |
-| Normalization headroom | –1 dBFS (0.89 peak) |
-| Processing | Single Web Worker, synchronous Float32Array |
+| Max input duration | 300s (5 min) |
+| Max output duration | 90s |
+| Input formats | WAV, AIFF, FLAC, MP3, M4A, OGG |
+| Output format | 48kHz · 16‑bit WAV |
+| Processing | Single Web Worker, sync Float32Array |
 
 ---
 
-## License
+## 📜 License
 
-MIT — use it, fork it, ship it. If you make something cool, [let me know](https://github.com/achuthanmukundan00/Resample-Lab).
+<p align="center">
+  <em>MIT — use it, fork it, ship it. If you make something cool, <a href="https://github.com/achuthanmukundan00/Resample-Lab">let me know</a>.</em>
+</p>
