@@ -60,12 +60,21 @@ function makeSample(
 
 // ---------- Ambient Stretch Lab ----------
 
-function ambientStretchLab(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
-    const stereo = ensureStereo(src.channels);
+    let stereo = ensureStereo(src.channels);
+
+    // Cap source to 60s so WSOLA stretch doesn't produce absurd intermediate buffers
+    const maxSourceS = 60;
+    const sourceSamples = Math.floor(sr * maxSourceS);
+    if (stereo[0].length > sourceSamples) {
+      stereo = [stereo[0].slice(0, sourceSamples), stereo[1].slice(0, sourceSamples)];
+    }
+
+    onProgress?.(0.06, "Stretching bed…");
 
     // 1. Long stretched bed — WSOLA + reverb + tape wow + lowpass (+ reverse layer)
     const stretch = 8 + chaos * 12;
@@ -691,6 +700,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     // 2. Degraded loop — bitcrush + downsample + noise + wow
     let degradedLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
     degradedLoop = T.repeatToDuration(degradedLoop, targetSamples);
+    degradedLoop = T.normalizePeak(degradedLoop, 0.95);  // normalize before degradation to avoid silent output
     degradedLoop = T.downsample(degradedLoop, sr, 2 + Math.floor(chaos * 6));
     degradedLoop = T.bitcrush(degradedLoop, 4 + Math.floor(chaos * 6));
     degradedLoop = T.addNoise(degradedLoop, 0.01 + chaos * 0.03);
@@ -713,6 +723,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     // 3. Ghost loop — reverb + lowpass + stereo widen
     let ghostLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
     ghostLoop = T.repeatToDuration(ghostLoop, targetSamples);
+    ghostLoop = T.normalizePeak(ghostLoop, 0.95);
     ghostLoop = T.simpleReverb(ghostLoop, sr, 0.4 + chaos * 0.4, 2);
     ghostLoop = T.lowpass(ghostLoop, sr, 1500 - chaos * 1000);
     ghostLoop = T.stereoWiden(ghostLoop, 0.3 + chaos * 0.5);
@@ -732,6 +743,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     // 4. Driven loop — saturation + delay + filter
     let drivenLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
     drivenLoop = T.repeatToDuration(drivenLoop, targetSamples);
+    drivenLoop = T.normalizePeak(drivenLoop, 0.95);
     drivenLoop = T.softClip(drivenLoop, 0.3 + chaos * 0.5);
     drivenLoop = T.delayEcho(drivenLoop, sr, 60 + chaos * 100, 0.2 + chaos * 0.3, 0.35);
     drivenLoop = T.bandpass(drivenLoop, sr, 80, 4000 + chaos * 4000);
@@ -859,7 +871,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
 
 // ---------- Chaos Pack ----------
 
-function chaosPack(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function chaosPack(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
@@ -875,16 +887,19 @@ function chaosPack(files: AudioBufferData[], chaos: number): GeneratedSample[] {
     const cRiser = Math.min(1, chaos * 0.7 + rng.next() * 0.3);
 
     // 1. Ambience (from ambient_stretch, pick ghost pad variant)
+    onProgress?.(0.08, "Generating ambience…");
     const ambResults = ambientStretchLab([src], cAmbient);
     const padSample = ambResults.find((s) => s?.filename?.includes("ghost_pad"));
     if (padSample) outputs.push(padSample);
 
     // 2. Ghost reverse oddity
+    onProgress?.(0.18, "Generating ghost reverse…");
     const ghostResults = ghostReverseLab([src], cGhost);
     const ghostSample = ghostResults.find((s) => s?.filename?.includes("ghost_hit"));
     if (ghostSample) outputs.push(ghostSample);
 
     // 3-4. Two granular shards (different types)
+    onProgress?.(0.28, "Scattering granular shards…");
     const granResults = granularShards([src], cGranular);
     const microChop = granResults.find((s) => s?.filename?.includes("micro_chop"));
     const pitchCloud = granResults.find((s) => s?.filename?.includes("pitch_cloud"));
@@ -892,16 +907,19 @@ function chaosPack(files: AudioBufferData[], chaos: number): GeneratedSample[] {
     if (pitchCloud) outputs.push(pitchCloud);
 
     // 5. Degraded loop
+    onProgress?.(0.40, "Finding loop candidates…");
     const loopResults = loopExtractor([src], cDegrade);
     const degradedLoop = loopResults.find((s) => s?.filename?.includes("degraded_loop"));
     if (degradedLoop) outputs.push(degradedLoop);
 
     // 6. Impact/riser
+    onProgress?.(0.50, "Building risers and impacts…");
     const riserResults = impactRiserMutator([src], cRiser);
     const riser = riserResults.find((s) => s?.filename?.includes("riser"));
     if (riser) outputs.push(riser);
 
     // 7. Pitch-wrecked oddity
+    onProgress?.(0.55, "Wrecking pitch…");
     const pitchResults = pitchWreckage([src], cPitch);
     const oddity = pitchResults.find((s) => s?.filename?.includes("octave_down"));
     if (oddity) outputs.push(oddity);
@@ -917,7 +935,7 @@ function hashCode(str: string): number {
 
 // ---------- Registry ----------
 
-type PresetFn = (files: AudioBufferData[], chaos: number) => GeneratedSample[];
+type PresetFn = (files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void) => GeneratedSample[];
 
 const RECIPE_REGISTRY: Record<string, { fn: PresetFn; outputCount: number; categories: SampleCategory[] }> = {
   ambient_stretch: {
@@ -983,7 +1001,7 @@ export function generatePack(
   if (!recipe) throw new Error(`Unknown preset: ${preset}`);
 
   onProgress(0.05, "Processing audio…");
-  const samples = recipe.fn(files, chaos);
+  const samples = recipe.fn(files, chaos, onProgress);
 
   const manifestSamples: PackManifestSample[] = samples.map((s) => ({
     filename: s.filename,
