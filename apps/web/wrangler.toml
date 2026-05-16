@@ -1,0 +1,16 @@
+# Cloudflare Pages configuration for Resample-Lab frontend.
+# The API backend must run separately (see docs/deployment.md).
+#
+# Deploy:
+#   npx wrangler pages deploy out --branch main
+#   → deploys to https://resample-lab.pages.dev
+#
+# Set production env var:
+#   npx wrangler pages secret put NEXT_PUBLIC_API_BASE_URL
+#   → e.g. https://api.resample-lab.com
+#
+# For a custom route on an existing domain, use the Cloudflare dashboard
+# to add a Pages route or a redirect rule.
+
+name = "resample-lab"
+compatibility_date = "2025-05-01"

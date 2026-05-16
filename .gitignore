@@ -19,3 +19,32 @@ venv/
 
 # Logs
 *.log
+
+# Audio artifacts (generated packs, uploads)
+packs/
+generated/
+exports/
+uploads/
+
+# Generated ZIP files
+*.zip
+
+# Generated audio files in output dirs
+output/**/*.wav
+output/**/*.mp3
+output/**/*.flac
+generated/**/*.wav
+generated/**/*.mp3
+generated/**/*.flac
+uploads/**/*.wav
+uploads/**/*.mp3
+
+# Temp audio processing
+tmp/
+temp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

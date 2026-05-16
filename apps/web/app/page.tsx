@@ -1,65 +1,185 @@
-import Image from "next/image";
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import UploadDropzone from '@/components/UploadDropzone'
+import PresetCard from '@/components/PresetCard'
+import ChaosSlider from '@/components/ChaosSlider'
+import OutputFormatSelector from '@/components/OutputFormatSelector'
+import LocalFirstBadge from '@/components/LocalFirstBadge'
+import GenerateButton from '@/components/GenerateButton'
+import PackStatusCard from '@/components/PackStatusCard'
+import Footer from '@/components/Footer'
+import { api } from '@/lib/api'
+import { PRESETS } from '@/lib/presets'
+import { Capabilities, PackStatusResponse } from '@/lib/types'
 
 export default function Home() {
+  const [files, setFiles] = useState<File[]>([])
+  const [selectedPreset, setSelectedPreset] = useState<string>(PRESETS[0].id)
+  const [chaos, setChaos] = useState(0.33)
+  const [outputFormat, setOutputFormat] = useState('wav')
+  const [packId, setPackId] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
+
+  useEffect(() => {
+    api
+      .getCapabilities()
+      .then(setCapabilities)
+      .catch(() => {
+        setCapabilities({
+          presets: PRESETS,
+          chaos_levels: { min: 0, max: 1, step: 0.01 },
+          output_formats: ['wav', 'aiff', 'flac'],
+          accepted_extensions: ['wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg'],
+          max_upload_mb: 50,
+          max_duration_seconds: 600,
+          tools: {},
+        })
+      })
+  }, [])
+
+  const handleSubmit = useCallback(async () => {
+    if (files.length === 0 || !selectedPreset || isProcessing) return
+
+    setIsProcessing(true)
+    setError(null)
+    setPackId(null)
+
+    try {
+      const packName =
+        files.length === 1
+          ? files[0].name.replace(/\.[^.]+$/, '')
+          : `pack-${Date.now()}`
+
+      const response = await api.createPack(
+        files,
+        selectedPreset,
+        chaos,
+        outputFormat,
+        packName,
+      )
+      setPackId(response.pack_id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create pack')
+      setIsProcessing(false)
+    }
+  }, [files, selectedPreset, chaos, outputFormat, isProcessing])
+
+  const handlePackComplete = useCallback(
+    (_status: PackStatusResponse) => {
+      setIsProcessing(false)
+    },
+    [],
+  )
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-col min-h-screen">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-12 space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <img
+              src="/wyt-logo.png"
+              alt=""
+              className="h-6 w-6 object-contain opacity-70"
+            />
+            <h1 className="text-xl font-semibold tracking-tight">
+              <span className="text-foreground">Resample</span>
+              <span className="text-accent">-Lab</span>
+            </h1>
+            <LocalFirstBadge />
+          </div>
+          <p className="text-sm text-zinc-500">
+            Turn any sound into a sample pack. Non-AI DSP, fully local.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Upload */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Source Audio
+          </h2>
+          <UploadDropzone
+            onFilesSelected={setFiles}
+            acceptedExtensions={
+              capabilities?.accepted_extensions || [
+                'wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg',
+              ]
+            }
+            maxUploadMb={capabilities?.max_upload_mb || 50}
+          />
+        </section>
+
+        {/* Preset Selection */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-accent">
+            Preset
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(capabilities?.presets || PRESETS).map((preset) => (
+              <PresetCard
+                key={preset.id}
+                preset={preset}
+                isSelected={selectedPreset === preset.id}
+                onSelect={setSelectedPreset}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Chaos + Format */}
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <h2 className="text-xs font-medium uppercase tracking-wider text-accent mb-3">
+              Chaos
+            </h2>
+            <ChaosSlider value={chaos} onChange={setChaos} />
+          </div>
+          <div>
+            <h2 className="text-xs font-medium uppercase tracking-wider text-accent mb-3">
+              Format
+            </h2>
+            <OutputFormatSelector
+              value={outputFormat}
+              onChange={setOutputFormat}
+              formats={capabilities?.output_formats || ['wav', 'aiff', 'flac']}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-xl border border-accent-dim/50 bg-accent-dim/10 p-3">
+            <p className="text-sm text-accent">{error}</p>
+          </div>
+        )}
+
+        {/* Generate */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit()
+          }}
+        >
+          <GenerateButton
+            disabled={files.length === 0 || isProcessing}
+            isProcessing={isProcessing}
+          />
+        </form>
+
+        {/* Pack Status */}
+        {packId && (
+          <PackStatusCard
+            key={packId}
+            packId={packId}
+            onComplete={handlePackComplete}
+          />
+        )}
       </main>
+
+      <Footer />
     </div>
-  );
+  )
 }
