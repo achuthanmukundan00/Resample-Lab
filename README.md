@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Web_Audio-FF6B6B?logo=audacity&logoColor=white" alt="Web Audio" />
 </p>
 
-  https://github.com/achuthanmukundan00/Resample-Lab/blob/main/docs/assets/demo.webm)
+  https://github.com/achuthanmukundan00/Resample-Lab/blob/main/docs/assets/demo.webm
 
 </div>
 
