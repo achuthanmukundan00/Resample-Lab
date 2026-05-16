@@ -1,6 +1,16 @@
 import { Capabilities, PackCreateResponse, PackListResponse, PackStatusResponse } from "@/lib/types"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+// Static export — NEXT_PUBLIC_* env vars are inlined at build time and can't
+// be changed per-environment.  Detect the backend URL from the current hostname.
+function getApiBase(): string {
+  if (typeof window === "undefined") return "http://localhost:8000"
+  const host = window.location.hostname
+  if (host === "localhost" || host === "127.0.0.1") return "http://localhost:8000"
+  // Production backend
+  return "https://resample-lab-api.onrender.com"
+}
+
+const API_BASE = getApiBase()
 
 class ApiError extends Error {
   constructor(message: string, public status: number) {
