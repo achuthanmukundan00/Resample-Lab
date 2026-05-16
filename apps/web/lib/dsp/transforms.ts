@@ -802,3 +802,46 @@ export function repeatToDuration(channels: Float32Array[], targetSamples: number
 export function makeAudioData(data: AudioBufferData, newChannels: Float32Array[]): AudioBufferData {
   return { name: data.name, sampleRate: data.sampleRate, channels: newChannels };
 }
+
+// ---------- Haas effect (randomized per-channel delay for stereo widening) ----------
+
+export function haasEffect(
+  channels: Float32Array[],
+  sr: number,
+  maxDelayMs: number = 12,
+): Float32Array[] {
+  if (channels.length < 2) return channels.map((c) => c.slice());
+  const maxDelaySamples = Math.max(1, Math.floor((sr * maxDelayMs) / 1000));
+  if (maxDelaySamples <= 1) return channels.map((c) => c.slice());
+
+  // Each channel gets a random delay between 1..maxDelayMs ms
+  const delays = channels.map(() =>
+    1 + Math.floor(Math.random() * (maxDelaySamples - 1)),
+  );
+
+  return channels.map((ch, ci) => {
+    const d = delays[ci];
+    const out = new Float32Array(ch.length);
+    for (let i = d; i < ch.length; i++) out[i] = ch[i - d];
+    return out;
+  });
+}
+
+// ---------- Warm character chain (highpass + lowpass + soft clip) ----------
+
+export function finalWarm(
+  channels: Float32Array[],
+  sr: number,
+  opts: { highpassHz?: number; lowpassHz?: number; softClipDrive?: number } = {},
+): Float32Array[] {
+  const hp = opts.highpassHz ?? 20;
+  const lp = opts.lowpassHz ?? 60;
+  const drive = opts.softClipDrive ?? 0.3;
+
+  let out = channels;
+  if (hp > 10 && hp < sr / 2) out = highpass(out, sr, hp);
+  if (lp > 10 && lp < sr / 2) out = lowpass(out, sr, lp);
+  if (drive > 0) out = softClip(out, drive);
+  out = normalizePeak(out, 0.95);
+  return out;
+}

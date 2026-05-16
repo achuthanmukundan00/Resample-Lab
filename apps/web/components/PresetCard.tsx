@@ -28,9 +28,9 @@ export default function PresetCard({ preset, isSelected, onSelect }: PresetCardP
         <span className="text-xs text-zinc-600">{preset.output_count} outputs</span>
         <span className="text-zinc-700">·</span>
         <div className="flex gap-1 flex-wrap">
-          {preset.categories.map((cat, i) => (
+          {[...new Set(preset.categories)].map((cat) => (
             <span
-              key={i}
+              key={cat}
               className="text-xs px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 capitalize"
             >
               {cat.replace('_', ' ')}

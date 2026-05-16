@@ -83,7 +83,8 @@ function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?:
     bed = T.simpleReverb(bed, sr, 0.4 + chaos * 0.5, 3);
     bed = T.tapeWow(bed, sr, 0.002 + chaos * 0.004, 3);
     bed = T.lowpass(bed, sr, Math.max(60, 3000 - chaos * 2000));
-    bed = T.normalizePeak(bed, 0.95);
+    bed = T.haasEffect(bed, sr);
+    bed = T.finalWarm(bed, sr);
     outputs.push(
       makeSample(
         `${stem}__stretched_bed.wav`,
@@ -102,7 +103,7 @@ function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?:
     smear = T.simpleReverb(smear, sr, 0.3 + chaos * 0.4, 2);
     smear = T.lowpass(smear, sr, 2000 - chaos * 1200);
     smear = T.fadeIn(smear, sr, 500);
-    smear = T.normalizePeak(smear, 0.95);
+    smear = T.finalWarm(smear, sr);
     outputs.push(
       makeSample(
         `${stem}__reverse_smear.wav`,
@@ -121,7 +122,8 @@ function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?:
     pad = T.stereoWiden(pad, 0.3 + chaos * 0.5);
     pad = T.fadeIn(pad, sr, 300);
     pad = T.fadeOut(pad, sr, 500);
-    pad = T.normalizePeak(pad, 0.95);
+    pad = T.haasEffect(pad, sr);
+    pad = T.finalWarm(pad, sr);
     outputs.push(
       makeSample(
         `${stem}__ghost_pad.wav`,
@@ -142,6 +144,7 @@ function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?:
     tex = T.tapeWow(tex, sr, 0.004, 2);
     tex = T.fadeIn(tex, sr, 200);
     tex = T.fadeOut(tex, sr, 300);
+    tex = T.haasEffect(tex, sr);
     tex = T.normalizePeak(tex, 0.95);
     outputs.push(
       makeSample(
@@ -161,7 +164,8 @@ function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?:
     wash = T.lowpass(wash, sr, 1500 - chaos * 800);
     wash = T.fadeIn(wash, sr, 1000);
     wash = T.fadeOut(wash, sr, 1000);
-    wash = T.normalizePeak(wash, 0.95);
+    wash = T.haasEffect(wash, sr);
+    wash = T.finalWarm(wash, sr);
     outputs.push(
       makeSample(
         `${stem}__reverb_wash.wav`,
@@ -189,7 +193,7 @@ function ghostReverseLab(files: AudioBufferData[], chaos: number): GeneratedSamp
     revTail = T.delayEcho(revTail, sr, 80 + chaos * 200, 0.3 + chaos * 0.5, 0.5);
     revTail = T.simpleReverb(revTail, sr, 0.2 + chaos * 0.3, 1.5);
     revTail = T.fadeIn(revTail, sr, 200 + chaos * 300);
-    revTail = T.normalizePeak(revTail, 0.95);
+    revTail = T.finalWarm(revTail, sr);
     outputs.push(
       makeSample(
         `${stem}__reverse_tail.wav`,
@@ -212,7 +216,8 @@ function ghostReverseLab(files: AudioBufferData[], chaos: number): GeneratedSamp
     ghost = T.simpleReverb(ghost, sr, 0.3 + chaos * 0.4, 2);
     ghost = T.softClip(ghost, 0.2 + chaos * 0.3);
     ghost = T.fadeIn(ghost, sr, 300);
-    ghost = T.normalizePeak(ghost, 0.95);
+    ghost = T.haasEffect(ghost, sr);
+    ghost = T.finalWarm(ghost, sr);
     outputs.push(
       makeSample(
         `${stem}__ghost_hit.wav`,
@@ -229,7 +234,8 @@ function ghostReverseLab(files: AudioBufferData[], chaos: number): GeneratedSamp
     pre = T.simpleReverb(pre, sr, 0.4 + chaos * 0.4, 2);
     pre = T.tapeWow(pre, sr, 0.003 + chaos * 0.005, 2);
     pre = T.fadeIn(pre, sr, 400);
-    pre = T.normalizePeak(pre, 0.95);
+    pre = T.haasEffect(pre, sr);
+    pre = T.finalWarm(pre, sr);
     outputs.push(
       makeSample(
         `${stem}__filtered_pre.wav`,
@@ -247,6 +253,7 @@ function ghostReverseLab(files: AudioBufferData[], chaos: number): GeneratedSamp
     imp = T.simpleReverb(imp, sr, 0.2 + chaos * 0.3, 1);
     imp = T.lowpass(imp, sr, 3000 - chaos * 1500);
     imp = T.fadeIn(imp, sr, 100);
+    imp = T.haasEffect(imp, sr);
     imp = T.normalizePeak(imp, 0.95);
     outputs.push(
       makeSample(
@@ -490,6 +497,7 @@ function bitrotDirt(files: AudioBufferData[], chaos: number): GeneratedSample[] 
     wow = T.softClip(wow, 0.2 + chaos * 0.5);
     wow = T.lowpass(wow, sr, 5000 - chaos * 3000);
     wow = T.addNoise(wow, chaos * 0.015);
+    wow = T.haasEffect(wow, sr);
     wow = T.normalizePeak(wow, 0.95);
     outputs.push(
       makeSample(
@@ -516,6 +524,7 @@ function bitrotDirt(files: AudioBufferData[], chaos: number): GeneratedSample[] 
       loop = T.lowpass(loop, sr, 3000 - chaos * 2000);
       loop = T.fadeIn(loop, sr, 50);
       loop = T.fadeOut(loop, sr, 100);
+      loop = T.haasEffect(loop, sr);
       loop = T.normalizePeak(loop, 0.95);
       outputs.push(
         makeSample(
@@ -622,6 +631,7 @@ function pitchWreckage(files: AudioBufferData[], chaos: number): GeneratedSample
     let drift = T.simpleReverb(driftCh, sr, 0.2 + chaos * 0.3, 2);
     drift = T.fadeIn(drift, sr, 50);
     drift = T.fadeOut(drift, sr, 100);
+    drift = T.haasEffect(drift, sr);
     drift = T.normalizePeak(drift, 0.95);
     outputs.push(
       makeSample(
@@ -686,7 +696,8 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     cleanLoop = T.repeatToDuration(cleanLoop, Math.max(targetSamples, cleanLoop[0].length));
     cleanLoop = T.fadeIn(cleanLoop, sr, 10);
     cleanLoop = T.fadeOut(cleanLoop, sr, 20);
-    cleanLoop = T.normalizePeak(cleanLoop, 0.95);
+    cleanLoop = T.haasEffect(cleanLoop, sr);
+    cleanLoop = T.finalWarm(cleanLoop, sr);
     outputs.push(
       makeSample(
         `${stem}__clean_loop.wav`,
@@ -709,6 +720,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     degradedLoop = T.softClip(degradedLoop, 0.2 + chaos * 0.4);
     degradedLoop = T.fadeIn(degradedLoop, sr, 10);
     degradedLoop = T.fadeOut(degradedLoop, sr, 20);
+    degradedLoop = T.haasEffect(degradedLoop, sr);
     degradedLoop = T.normalizePeak(degradedLoop, 0.95);
     outputs.push(
       makeSample(
@@ -729,7 +741,8 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     ghostLoop = T.stereoWiden(ghostLoop, 0.3 + chaos * 0.5);
     ghostLoop = T.fadeIn(ghostLoop, sr, 50);
     ghostLoop = T.fadeOut(ghostLoop, sr, 100);
-    ghostLoop = T.normalizePeak(ghostLoop, 0.95);
+    ghostLoop = T.haasEffect(ghostLoop, sr);
+    ghostLoop = T.finalWarm(ghostLoop, sr);
     outputs.push(
       makeSample(
         `${stem}__ghost_loop.wav`,
@@ -750,6 +763,7 @@ function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample
     drivenLoop = T.dcBlock(drivenLoop, sr);
     drivenLoop = T.fadeIn(drivenLoop, sr, 10);
     drivenLoop = T.fadeOut(drivenLoop, sr, 20);
+    drivenLoop = T.haasEffect(drivenLoop, sr);
     drivenLoop = T.normalizePeak(drivenLoop, 0.95);
     outputs.push(
       makeSample(
@@ -781,7 +795,8 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     riser = T.softClip(riser, chaos * 0.4);
     riser = T.simpleReverb(riser, sr, 0.2 + chaos * 0.3, 1.5);
     riser = T.filterSweep(riser, sr, 200, 3000 + chaos * 5000);
-    riser = T.normalizePeak(riser, 0.95);
+    riser = T.haasEffect(riser, sr);
+    riser = T.finalWarm(riser, sr);
     outputs.push(
       makeSample(
         `${stem}__riser.wav`,
@@ -799,7 +814,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     impact = T.highpass(impact, sr, 40);
     impact = T.simpleReverb(impact, sr, 0.2 + chaos * 0.3, 1.5);
     impact = T.fadeOut(impact, sr, 200);
-    impact = T.normalizePeak(impact, 0.95);
+    impact = T.finalWarm(impact, sr);
     outputs.push(
       makeSample(
         `${stem}__impact.wav`,
@@ -835,7 +850,7 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
       for (let i = 0; i < ch.length; i++) out[i] = ch[i] * (1 - wet) + smearCh[ci][i] * wet;
       return out;
     });
-    let smear = T.normalizePeak(smeared);
+    let smear = T.finalWarm(smeared, sr);
     smear = T.fadeOut(smear, sr, 100);
     outputs.push(
       makeSample(
@@ -855,7 +870,8 @@ function impactRiserMutator(files: AudioBufferData[], chaos: number): GeneratedS
     sweepRiser = T.delayEcho(sweepRiser, sr, 50 + chaos * 80, 0.2, 0.3);
     sweepRiser = T.fadeIn(sweepRiser, sr, 1000 + chaos * 2000);
     sweepRiser = T.lowpass(sweepRiser, sr, 6000 - chaos * 3000);
-    sweepRiser = T.normalizePeak(sweepRiser, 0.95);
+    sweepRiser = T.haasEffect(sweepRiser, sr);
+    sweepRiser = T.finalWarm(sweepRiser, sr);
     outputs.push(
       makeSample(
         `${stem}__filter_riser.wav`,
