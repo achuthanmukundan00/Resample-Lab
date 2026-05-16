@@ -32,13 +32,19 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         audio, sr = io.read_audio(src)
         dur = len(audio) / sr
 
+        # Free original audio immediately — stretched versions dwarf it
+        del audio
+
         # 1. Long stretch bed (8x-16x)
         stretch = 8.0 + chaos * 8.0
         temp = output_dir / f"{stem}__ambient_bed.wav"
         dst = io.convert_to_wav(src, output_dir)
         transforms.ffmpeg_stretch(dst, temp, 1.0 / stretch)
-        # Reverb wash
+        # Reverb wash — cap at 30s to keep peak under 15 MB
         audio_bed, _ = io.read_audio(temp)
+        max_bed_s = 30.0
+        if len(audio_bed) / sr > max_bed_s:
+            audio_bed = audio_bed[:int(sr * max_bed_s)]
         reverb_decay = 0.3 + chaos * 0.5
         audio_bed = transforms.simple_reverb(audio_bed, sr, decay=reverb_decay, tail_s=2.0)
         audio_bed = transforms.tape_wow(audio_bed, sr, depth=0.002 + chaos * 0.005)
@@ -50,12 +56,14 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
             "tools": ["ffmpeg"], "parameters": {"stretch": stretch},
         })
 
-        # 2. Reverse smear
+        # 2. Reverse smear — 4x slower, cap at 30s
         temp2 = output_dir / f"{stem}__reverse_smear.wav"
         rev = output_dir / f"{stem}__rev_tmp.wav"
         transforms.ffmpeg_stretch(dst, rev, 0.25)  # 4x slower
         # Reverse + filter via Python
         audio_rev, _ = io.read_audio(rev)
+        if len(audio_rev) / sr > 30.0:
+            audio_rev = audio_rev[:int(sr * 30.0)]
         audio_rev = transforms.reverse(audio_rev, sr)
         audio_rev = transforms.lowpass(audio_rev, sr, 1000.0 - chaos * 600.0)
         audio_rev = io.fade_in(audio_rev, sr, 300)
@@ -87,7 +95,6 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         })
 
         dst.unlink(missing_ok=True)
-        del audio
         gc.collect()
 
     return outputs
@@ -119,11 +126,17 @@ def ghost_reverse_lab(source_paths: list[Path], output_dir: Path, chaos: float) 
             "parameters": {"delay_ms": delay_ms, "decay": decay},
         })
 
+        # Free audio before loading 2x-stretched intermediate
+        del audio
+
         # 2. Ghost hit — bandpass + reverse + 2x stretch + reverb
         temp2 = output_dir / f"{stem}__ghost_hit.wav"
         wav_src = io.convert_to_wav(src, output_dir)
         transforms.ffmpeg_stretch(wav_src, temp2, 0.5)
         audio_ghost, _ = io.read_audio(temp2)
+        # Cap stretched audio at 60s to bound peak memory
+        if len(audio_ghost) / sr > 60.0:
+            audio_ghost = audio_ghost[:int(sr * 60.0)]
         audio_ghost = transforms.reverse(audio_ghost, sr)
         center_freq = 600.0 + chaos * 1400.0
         q_factor = 1.0 + chaos * 4.0
@@ -142,7 +155,8 @@ def ghost_reverse_lab(source_paths: list[Path], output_dir: Path, chaos: float) 
             "parameters": {"center_freq": center_freq, "q": q_factor},
         })
 
-        # 3. Reverse-echo-forward
+        # 3. Reverse-echo-forward — re-read source (audio was freed for output 2)
+        audio, sr = io.read_audio(src)
         temp3 = output_dir / f"{stem}__reverse_echo_fwd.wav"
         rev = transforms.reverse(audio, sr)
         delay_ms_2 = 50.0 + chaos * 200.0
