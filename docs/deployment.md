@@ -1,106 +1,68 @@
 # Deployment
 
-Resample-Lab has two independently deployable parts:
-
-1. **Frontend** — static Next.js app, deployable to Cloudflare Pages
-2. **API Backend** — Python FastAPI + ffmpeg, needs a VM/VPS or container host
+Resample-Lab is a **fully static frontend** — the entire DSP engine runs in the browser with no backend required.
 
 ---
 
-## Frontend: Cloudflare Pages
+## Quick Deploy (Cloudflare Pages)
 
-### Prerequisites
+1. Push the repo to GitHub
+2. Go to **Cloudflare Dashboard → Workers & Pages → Create → Pages**
+3. Connect your GitHub repository
+4. Build settings:
+   - **Framework preset**: None (use manual)
+   - **Build command**: `cd apps/web && pnpm install && pnpm build`
+   - **Build output**: `apps/web/out`
+5. Deploy
 
-- Node.js 18+ and pnpm
-- A Cloudflare account
-- (Optional) `wrangler` CLI: `npm install -g wrangler`
+That's it. No environment variables. No database. No API keys.
 
-### Build
+---
+
+## Manual Build
 
 ```bash
-cd apps/web
+git clone https://github.com/achuthanmukundan00/Resample-Lab.git
+cd Resample-Lab/apps/web
 pnpm install
-pnpm build   # outputs to apps/web/out/
+pnpm build    # outputs static export to apps/web/out/
 ```
 
-### Deploy via Wrangler
+The `out/` directory is a fully self-contained static site. Serve it from any web server, S3 bucket, or CDN:
 
 ```bash
-cd apps/web
+# Test locally
+pnpm start
+
+# Deploy to any static host
 npx wrangler pages deploy out --branch main
 ```
 
-### Deploy via Cloudflare Dashboard
+---
 
-1. Go to **Cloudflare Dashboard → Workers & Pages → Create → Pages**
-2. Connect your Git repository
-3. Build settings:
-   - Framework: Next.js (static export)
-   - Build command: `cd apps/web && pnpm install && pnpm build`
-   - Output directory: `apps/web/out`
-4. Set environment variable:
-   - `NEXT_PUBLIC_API_BASE_URL` = your production API URL
-5. Deploy
+## Any Static Host
 
-### Custom Route
+Since the output is plain HTML + JS + CSS, you can deploy anywhere:
 
-To serve the app at `https://yourdomain.com/resample/`:
+| Host | Notes |
+|------|-------|
+| Cloudflare Pages | Free, global CDN, auto-deploys from GitHub |
+| Vercel | Free tier, configure output directory as `apps/web/out` |
+| Netlify | Drag-and-drop `out/` folder or connect GitHub |
+| GitHub Pages | Push `out/` to `gh-pages` branch |
+| S3 + CloudFront | `aws s3 sync out/ s3://your-bucket` |
+| Any web server | Copy `out/` contents to your server's document root |
 
-1. In Cloudflare Dashboard, go to your domain → **Rules → Page Rules**
-2. Create a rule: `yourdomain.com/resample*` → Forward to `resample-lab.pages.dev`
-   - Or use **Pages → your project → Custom domains** and set the route prefix
+No special server configuration required — no rewrites, no redirects, no SPA fallback. The app has one route (`/`) plus `/docs`, both statically generated.
 
 ---
 
-## API Backend
+## Why No Backend?
 
-The Python API requires:
+The original version of Resample-Lab used a Python FastAPI backend with ffmpeg + numpy/scipy for DSP. The current version runs all processing **entirely in the browser** via Web Workers. This means:
 
-- Python 3.9+
-- numpy, scipy, soundfile, uvicorn, fastapi
-- ffmpeg (system dependency)
-- (Optional) PostgreSQL + Redis for job persistence
-
-### Deploy via Docker (recommended)
-
-```bash
-cd infra/docker
-docker compose up -d        # PostgreSQL + Redis
-cd ../..
-docker build -t resample-lab-api -f infra/Dockerfile .
-docker run -d -p 8000:8000 resample-lab-api
-```
-
-### Deploy on a VPS
-
-```bash
-# Install dependencies
-sudo apt install ffmpeg python3-pip
-pip install -r apps/api/requirements.txt
-
-# Run
-cd apps/api
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### Recommended Hosts
-
-| Host | Type | Notes |
-|------|------|-------|
-| Railway | Container | Easy auto-deploy from repo |
-| Fly.io | Container | Global edge, cheap for small apps |
-| Render | Container/Web Service | Good free tier |
-| Any VPS (Hetzner, etc.) | VM | Full control, cheapest at scale |
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql+psycopg2://app_user:app_password@localhost:5433/app_db` | PostgreSQL connection string (optional for basic pack generation) |
-| `MAX_UPLOAD_MB` | `100` | Per-request upload size limit in MB |
-| `MAX_AUDIO_DURATION` | `600` | Max per-file duration in seconds |
-| `JOB_TIMEOUT` | `300` | Pack generation timeout in seconds |
-| `PACK_TTL_HOURS` | `24` | Auto-cleanup age for pack directories |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed origins (set to your frontend URL in production) |
-
-Set `NEXT_PUBLIC_API_BASE_URL` in Cloudflare Pages to point to your deployed API.
+- Zero server costs
+- No data ever leaves the user's machine
+- Works offline after the first page load
+- Instant deploy to any static host
+- No rate limiting, no DDoS worries, no privacy compliance burden

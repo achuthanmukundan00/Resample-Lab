@@ -156,11 +156,13 @@ export default function Home() {
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-start sm:items-center gap-4 flex-wrap">
-            <img
-              src="/wyt-logo.png"
-              alt=""
-              className="h-20 w-20 sm:h-40 sm:w-40 object-contain opacity-85 shrink-0"
-            />
+            <a href="https://watchyourtemper.com" target="_blank" rel="noopener noreferrer">
+              <img
+                src="/wyt-logo.png"
+                alt="watchyourtemper"
+                className="h-20 w-20 sm:h-40 sm:w-40 object-contain opacity-85 shrink-0 hover:opacity-100 transition-opacity"
+              />
+            </a>
             <h1 className="text-lg sm:text-xl font-semibold tracking-tight mt-2 sm:mt-0">
               <span className="text-foreground">Resample</span>
               <span className="text-accent">-Lab</span>
