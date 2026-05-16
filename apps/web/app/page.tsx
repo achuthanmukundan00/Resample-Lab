@@ -10,7 +10,8 @@ import PackStatusCard from '@/components/PackStatusCard'
 import ManifestPreview from '@/components/ManifestPreview'
 import Footer from '@/components/Footer'
 import { PRESETS } from '@/lib/presets'
-import { AudioBufferData, Capabilities, PackManifest } from '@/lib/types'
+import { AudioBufferData, PackManifest } from '@/lib/dsp/types'
+import { Capabilities } from '@/lib/types'
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([])
