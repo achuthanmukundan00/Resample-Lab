@@ -1,78 +1,152 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import UploadDropzone from '@/components/UploadDropzone'
 import PresetCard from '@/components/PresetCard'
 import ChaosSlider from '@/components/ChaosSlider'
-import OutputFormatSelector from '@/components/OutputFormatSelector'
 import LocalFirstBadge from '@/components/LocalFirstBadge'
 import GenerateButton from '@/components/GenerateButton'
 import PackStatusCard from '@/components/PackStatusCard'
+import ManifestPreview from '@/components/ManifestPreview'
 import Footer from '@/components/Footer'
-import { api } from '@/lib/api'
 import { PRESETS } from '@/lib/presets'
-import { Capabilities, PackStatusResponse } from '@/lib/types'
+import { AudioBufferData, Capabilities, PackManifest } from '@/lib/types'
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([])
   const [selectedPreset, setSelectedPreset] = useState<string>(PRESETS[0].id)
   const [chaos, setChaos] = useState(0.33)
-  const [outputFormat, setOutputFormat] = useState('wav')
-  const [packId, setPackId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
 
+  // Local processing state
+  const [localProgress, setLocalProgress] = useState(0)
+  const [localMessage, setLocalMessage] = useState('')
+  const [localStatus, setLocalStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle')
+  const [zipBlob, setZipBlob] = useState<Blob | null>(null)
+  const [manifest, setManifest] = useState<PackManifest | null>(null)
+
+  const workerRef = useRef<Worker | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+
   useEffect(() => {
-    api
-      .getCapabilities()
-      .then(setCapabilities)
-      .catch(() => {
-        setCapabilities({
-          presets: PRESETS,
-          chaos_levels: { min: 0, max: 1, step: 0.01 },
-          output_formats: ['wav', 'aiff', 'flac'],
-          accepted_extensions: ['wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg'],
-          max_upload_mb: 50,
-          max_duration_seconds: 600,
-          tools: {},
-        })
-      })
+    setCapabilities({
+      presets: PRESETS,
+      chaos_levels: { min: 0, max: 1, step: 0.01 },
+      output_formats: ['wav'],
+      accepted_extensions: ['wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg'],
+      max_upload_mb: 50,
+      max_duration_seconds: 600,
+      tools: {},
+    })
   }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate()
+      audioCtxRef.current?.close()
+    }
+  }, [])
+
+  const handleDownload = useCallback(() => {
+    if (!zipBlob) return
+    const url = URL.createObjectURL(zipBlob)
+    const a = document.createElement('a')
+    a.href = url
+    const name =
+      files.length === 1
+        ? files[0].name.replace(/\.[^.]+$/, '')
+        : `resample-pack-${Date.now()}`
+    a.download = `${name}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, [zipBlob, files])
 
   const handleSubmit = useCallback(async () => {
     if (files.length === 0 || !selectedPreset || isProcessing) return
 
     setIsProcessing(true)
     setError(null)
-    setPackId(null)
+    setLocalStatus('processing')
+    setLocalProgress(0)
+    setLocalMessage('Decoding audio…')
+    setZipBlob(null)
+    setManifest(null)
 
     try {
-      const packName =
-        files.length === 1
-          ? files[0].name.replace(/\.[^.]+$/, '')
-          : `pack-${Date.now()}`
+      // 1. Decode audio files in the browser
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContext()
+      }
+      const ctx = audioCtxRef.current
 
-      const response = await api.createPack(
-        files,
-        selectedPreset,
-        chaos,
-        outputFormat,
-        packName,
+      const decodedFiles: AudioBufferData[] = []
+      for (const file of files) {
+        const buf = await file.arrayBuffer()
+        const audioBuf = await ctx.decodeAudioData(buf)
+        const channels: Float32Array[] = []
+        for (let i = 0; i < audioBuf.numberOfChannels; i++) {
+          channels.push(audioBuf.getChannelData(i))
+        }
+        decodedFiles.push({
+          name: file.name,
+          sampleRate: audioBuf.sampleRate,
+          channels,
+        })
+      }
+
+      // 2. Terminate previous worker
+      workerRef.current?.terminate()
+
+      // 3. Create processing worker
+      const worker = new Worker(
+        new URL('../lib/dsp/packWorker.ts', import.meta.url),
       )
-      setPackId(response.pack_id)
+      workerRef.current = worker
+
+      worker.onmessage = (e) => {
+        const msg = e.data
+        if (msg.type === 'progress') {
+          setLocalProgress(msg.value)
+          setLocalMessage(msg.message)
+        } else if (msg.type === 'complete') {
+          setZipBlob(msg.zipBlob)
+          setManifest(msg.manifest)
+          setLocalStatus('complete')
+          setIsProcessing(false)
+        } else if (msg.type === 'error') {
+          setError(msg.error)
+          setLocalStatus('error')
+          setIsProcessing(false)
+        }
+      }
+
+      // 4. Start processing
+      setLocalMessage('Generating samples…')
+      worker.postMessage({
+        type: 'generate',
+        files: decodedFiles,
+        preset: selectedPreset,
+        chaos,
+      })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create pack')
+      setError(e instanceof Error ? e.message : 'Processing failed')
+      setLocalStatus('error')
       setIsProcessing(false)
     }
-  }, [files, selectedPreset, chaos, outputFormat, isProcessing])
+  }, [files, selectedPreset, chaos, isProcessing])
 
-  const handlePackComplete = useCallback(
-    (_status: PackStatusResponse) => {
-      setIsProcessing(false)
-    },
-    [],
-  )
+  const handleReset = useCallback(() => {
+    setLocalStatus('idle')
+    setLocalProgress(0)
+    setZipBlob(null)
+    setManifest(null)
+    setError(null)
+  }, [])
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -92,7 +166,8 @@ export default function Home() {
             <LocalFirstBadge />
           </div>
           <p className="text-sm text-zinc-500">
-            Turn any sound into a sample pack. Non-AI DSP, fully local.
+            Turn any sound into a sample pack. Non-AI DSP, fully local — your
+            files never leave this browser.
           </p>
         </div>
 
@@ -129,20 +204,16 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Chaos + Format */}
+        {/* Chaos + Privacy Note */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div>
             <ChaosSlider value={chaos} onChange={setChaos} />
           </div>
-          <div>
-            <h2 className="text-xs font-medium uppercase tracking-wider text-accent mb-3">
-              Format
-            </h2>
-            <OutputFormatSelector
-              value={outputFormat}
-              onChange={setOutputFormat}
-              formats={capabilities?.output_formats || ['wav', 'aiff', 'flac']}
-            />
+          <div className="flex flex-col justify-end">
+            <p className="text-xs text-zinc-600 italic">
+              All processing runs in your browser. Your audio is never uploaded
+              to any server.
+            </p>
           </div>
         </div>
 
@@ -166,13 +237,21 @@ export default function Home() {
           />
         </form>
 
-        {/* Pack Status */}
-        {packId && (
+        {/* Processing Status */}
+        {(localStatus === 'processing' || localStatus === 'complete') && (
           <PackStatusCard
-            key={packId}
-            packId={packId}
-            onComplete={handlePackComplete}
+            localStatus={localStatus}
+            localProgress={localProgress}
+            localMessage={localMessage}
+            manifest={manifest}
+            onLocalDownload={handleDownload}
+            onReset={handleReset}
           />
+        )}
+
+        {/* Manifest preview after completion */}
+        {localStatus === 'complete' && manifest && (
+          <ManifestPreview manifest={manifest as unknown as Record<string, unknown>} />
         )}
       </main>
 
