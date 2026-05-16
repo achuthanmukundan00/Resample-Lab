@@ -1,7 +1,7 @@
 """Individual audio transform operations.
 
 All transforms accept (audio: np.ndarray, sample_rate: int, **kwargs) -> np.ndarray.
-Operations work on float64 arrays in shape (samples, channels).
+Operations work on float32 arrays in shape (samples, channels).
 """
 
 import subprocess
@@ -31,20 +31,20 @@ def normalize(audio: np.ndarray, sr: int, peak: float = 0.95) -> np.ndarray:
 def lowpass(audio: np.ndarray, sr: int, cutoff: float, order: int = 4) -> np.ndarray:
     cutoff = max(20.0, min(cutoff, sr / 2 - 1))
     sos = scipy_signal.butter(order, cutoff, btype="low", fs=sr, output="sos")
-    return scipy_signal.sosfilt(sos, audio, axis=0)
+    return np.asarray(scipy_signal.sosfilt(sos, audio, axis=0), dtype=np.float32)
 
 
 def highpass(audio: np.ndarray, sr: int, cutoff: float, order: int = 4) -> np.ndarray:
     cutoff = max(20.0, min(cutoff, sr / 2 - 1))
     sos = scipy_signal.butter(order, cutoff, btype="high", fs=sr, output="sos")
-    return scipy_signal.sosfilt(sos, audio, axis=0)
+    return np.asarray(scipy_signal.sosfilt(sos, audio, axis=0), dtype=np.float32)
 
 
 def bandpass(audio: np.ndarray, sr: int, low: float, high: float, order: int = 4) -> np.ndarray:
     low = max(20.0, low)
     high = min(sr / 2 - 1, high)
     sos = scipy_signal.butter(order, [low, high], btype="band", fs=sr, output="sos")
-    return scipy_signal.sosfilt(sos, audio, axis=0)
+    return np.asarray(scipy_signal.sosfilt(sos, audio, axis=0), dtype=np.float32)
 
 
 # ---------- Effects ----------
@@ -58,7 +58,7 @@ def bitcrush(audio: np.ndarray, sr: int, bits: int = 8) -> np.ndarray:
 
 
 def add_noise(audio: np.ndarray, sr: int, amount: float = 0.01) -> np.ndarray:
-    noise = np.random.randn(*audio.shape).astype(np.float64)
+    noise = np.random.randn(*audio.shape).astype(audio.dtype)
     peak = np.max(np.abs(audio))
     if peak > 1e-12:
         noise = noise * (peak * amount)
@@ -85,12 +85,15 @@ def simple_reverb(audio: np.ndarray, sr: int, decay: float = 0.5, tail_s: float 
         for i in range(delay, len(audio)):
             comb[i] = audio[i] + feedback * comb[i - delay]
         output += comb * 0.25
+        del comb
     # All-pass
     ap_delay = int(sr * 5 / 1000)
     ap_gain = 0.7
     for i in range(ap_delay, len(output)):
         output[i] = output[i] + ap_gain * output[i - ap_delay]
-    return normalize(output, sr, 1.0)
+    result = np.asarray(normalize(output, sr, 1.0), dtype=np.float32)
+    del output
+    return result
 
 
 # ---------- Pitch / stretch via ffmpeg ----------
@@ -172,6 +175,7 @@ def pitch_shift_grain(grain: np.ndarray, semitones: float) -> np.ndarray:
     ratio = 2.0 ** (semitones / 12.0)
     n = len(grain)
     shifted = scipy_signal.resample(grain, int(n / ratio), axis=0)
+    shifted = np.asarray(shifted, dtype=np.float32)
     if len(shifted) < n:
         shifted = np.pad(shifted, ((0, n - len(shifted)), (0, 0)), mode="constant")
     else:
@@ -222,7 +226,7 @@ def tape_wow(audio: np.ndarray, sr: int, depth: float = 0.005, rate: float = 4.0
     out = np.zeros_like(audio)
     for ch in range(audio.shape[1]):
         out[:, ch] = np.interp(phase, np.arange(n), audio[:, ch])
-    return out
+    return np.asarray(out, dtype=np.float32)
 
 
 def downsample(audio: np.ndarray, sr: int, factor: int = 4) -> np.ndarray:
@@ -232,10 +236,12 @@ def downsample(audio: np.ndarray, sr: int, factor: int = 4) -> np.ndarray:
     sos = scipy_signal.butter(8, cutoff, btype="low", fs=sr, output="sos")
     filtered = scipy_signal.sosfilt(sos, audio, axis=0)
     step = int(factor)
-    decimated = filtered[::step].copy()
+    decimated = np.asarray(filtered[::step].copy(), dtype=np.float32)
+    del filtered
     orig_indices = np.arange(len(decimated)) * step
     target_indices = np.arange(len(audio))
     upsampled = np.zeros_like(audio)
     for ch in range(audio.shape[1]):
         upsampled[:, ch] = np.interp(target_indices, orig_indices, decimated[:, ch])
-    return upsampled
+    del decimated
+    return np.asarray(upsampled, dtype=np.float32)

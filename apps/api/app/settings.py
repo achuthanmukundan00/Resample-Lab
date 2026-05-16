@@ -14,7 +14,7 @@ class Settings:
 
     @property
     def max_audio_duration(self) -> float:
-        return float(os.environ.get("MAX_AUDIO_DURATION", "600"))
+        return float(os.environ.get("MAX_AUDIO_DURATION", "180"))
 
     @property
     def job_timeout(self) -> int:

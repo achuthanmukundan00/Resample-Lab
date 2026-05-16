@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import math
 import random
@@ -42,6 +43,7 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         audio_bed = transforms.simple_reverb(audio_bed, sr, decay=reverb_decay, tail_s=2.0)
         audio_bed = transforms.tape_wow(audio_bed, sr, depth=0.002 + chaos * 0.005)
         io.write_audio(temp, audio_bed)
+        del audio_bed
         outputs.append({
             "path": str(temp.name), "category": "ambience",
             "recipe": "stretch", "source": src.name,
@@ -58,6 +60,7 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         audio_rev = transforms.lowpass(audio_rev, sr, 1000.0 - chaos * 600.0)
         audio_rev = io.fade_in(audio_rev, sr, 300)
         io.write_audio(temp2, audio_rev)
+        del audio_rev
         rev.unlink(missing_ok=True)
         outputs.append({
             "path": str(temp2.name), "category": "ambience",
@@ -75,6 +78,7 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         audio_pad = io.fade_in(audio_pad, sr, 200)
         audio_pad = io.fade_out(audio_pad, sr, 500)
         io.write_audio(temp3, audio_pad)
+        del audio_pad
         outputs.append({
             "path": str(temp3.name), "category": "ambience",
             "recipe": "ghost_pad", "source": src.name,
@@ -83,6 +87,8 @@ def ambient_stretch_lab(source_paths: list[Path], output_dir: Path, chaos: float
         })
 
         dst.unlink(missing_ok=True)
+        del audio
+        gc.collect()
 
     return outputs
 
@@ -100,10 +106,12 @@ def ghost_reverse_lab(source_paths: list[Path], output_dir: Path, chaos: float) 
         delay_ms = 80 + int(chaos * 200)
         decay = 0.3 + chaos * 0.5
         echoed = transforms.delay_echo(rev_audio, sr, delay_ms=delay_ms, feedback=decay, mix=0.4)
+        del rev_audio
         echoed = transforms.simple_reverb(echoed, sr, decay=0.2, tail_s=1.0)
         echoed = io.fade_in(echoed, sr, 200)
         temp1 = output_dir / f"{stem}__reverse_tail.wav"
         io.write_audio(temp1, echoed)
+        del echoed
         outputs.append({
             "path": str(temp1.name), "category": "ambience",
             "recipe": "reverse_tail", "source": src.name,
@@ -125,6 +133,7 @@ def ghost_reverse_lab(source_paths: list[Path], output_dir: Path, chaos: float) 
         audio_ghost = transforms.simple_reverb(audio_ghost, sr, decay=0.3 + chaos * 0.4, tail_s=1.5)
         audio_ghost = io.fade_in(audio_ghost, sr, 300)
         io.write_audio(temp2, audio_ghost)
+        del audio_ghost
         wav_src.unlink(missing_ok=True)
         outputs.append({
             "path": str(temp2.name), "category": "oddity",
@@ -139,21 +148,28 @@ def ghost_reverse_lab(source_paths: list[Path], output_dir: Path, chaos: float) 
         delay_ms_2 = 50.0 + chaos * 200.0
         feedback = 0.3 + chaos * 0.5
         echoed_rev = transforms.delay_echo(rev, sr, delay_ms=delay_ms_2, feedback=feedback, mix=0.5)
+        del rev
         echoed_rev = transforms.soft_clip(echoed_rev, sr, drive=chaos * 0.3)
         echoed_rev = io.normalize_peak(echoed_rev, -3.0)
         rev_back = transforms.reverse(echoed_rev, sr)
+        del echoed_rev
         mix = 0.3 + chaos * 0.4
         fade_len = min(len(audio) // 4, int(sr * 3))
         output = audio.copy()
         output[-fade_len:] = audio[-fade_len:] * (1 - mix) + rev_back[-fade_len:] * mix
+        del rev_back
         output = io.apply_fades(output, sr, 5)
         io.write_audio(temp3, output)
+        del output
         outputs.append({
             "path": str(temp3.name), "category": "oddity",
             "recipe": "reverse_echo_fwd", "source": src.name,
             "tools": ["numpy"],
             "parameters": {"delay_ms": delay_ms_2, "feedback": feedback},
         })
+
+        del audio
+        gc.collect()
 
     return outputs
 
@@ -168,20 +184,24 @@ def granular_shards(source_paths: list[Path], output_dir: Path, chaos: float) ->
         rng = random.Random(hash(stem) + int(chaos * 1000))
 
         # 1. Micro-chop sequence
-        grain_ms = 120.0 - chaos * 80.0
+        grain_ms = max(20.0, 120.0 - chaos * 80.0)
         grains = transforms.slice_audio(audio, sr, grain_ms)
         if grains:
             indices = list(range(len(grains)))
             rng.shuffle(indices)
             reordered = [grains[i] for i in indices]
+            del grains
             chopped = []
             for g in reordered:
                 g = transforms.soft_clip(g, sr, drive=chaos * 0.3)
                 chopped.append(io.fade_in(io.fade_out(g, sr, 3), sr, 3))
+            del reordered
             result = np.concatenate(chopped, axis=0)
+            del chopped
             result = io.normalize_peak(result)
             temp1 = output_dir / f"{stem}__micro_chop.wav"
             io.write_audio(temp1, result)
+            del result
             outputs.append({
                 "path": str(temp1.name), "category": "granular",
                 "recipe": "micro_chop", "source": src.name,
@@ -190,7 +210,7 @@ def granular_shards(source_paths: list[Path], output_dir: Path, chaos: float) ->
             })
 
         # 2. Pitch-shifted grain cloud
-        grain_ms_2 = 150.0 - chaos * 110.0
+        grain_ms_2 = max(20.0, 150.0 - chaos * 110.0)
         grains2 = transforms.slice_audio(audio, sr, grain_ms_2)
         if grains2:
             pitch_range = 6.0 + chaos * 18.0
@@ -200,11 +220,14 @@ def granular_shards(source_paths: list[Path], output_dir: Path, chaos: float) ->
                 shifted = transforms.pitch_shift_grain(g, semitones)
                 shifted = io.fade_in(io.fade_out(shifted, sr, 5), sr, 5)
                 cloud_grains.append(shifted)
+            del grains2
             result2 = np.concatenate(cloud_grains, axis=0)
+            del cloud_grains
             result2 = transforms.delay_echo(result2, sr, delay_ms=80.0, feedback=0.2 + chaos * 0.3, mix=0.3)
             result2 = io.normalize_peak(result2)
             temp2 = output_dir / f"{stem}__grain_cloud.wav"
             io.write_audio(temp2, result2)
+            del result2
             outputs.append({
                 "path": str(temp2.name), "category": "granular",
                 "recipe": "grain_cloud", "source": src.name,
@@ -213,7 +236,7 @@ def granular_shards(source_paths: list[Path], output_dir: Path, chaos: float) ->
             })
 
         # 3. Stutter bits
-        loop_ms = 120.0 - chaos * 100.0
+        loop_ms = max(20.0, 120.0 - chaos * 100.0)
         max_repeats = int(4 + chaos * 28)
         loop_samples = int(sr * loop_ms / 1000)
         gate_shape = 0.3 + chaos * 0.6
@@ -232,19 +255,25 @@ def granular_shards(source_paths: list[Path], output_dir: Path, chaos: float) ->
                 gated = ch * gate[:, None]
                 gated = io.fade_in(io.fade_out(gated, sr, 2), sr, 2)
                 stutter_parts.append(gated)
+        del chunks
         if stutter_parts:
             result3 = np.concatenate(stutter_parts, axis=0)
+            del stutter_parts
             result3 = transforms.tape_wow(result3, sr, depth=0.003 + chaos * 0.008, rate=5.0)
             result3 = transforms.soft_clip(result3, sr, drive=chaos * 0.25)
             result3 = io.normalize_peak(result3)
             temp3 = output_dir / f"{stem}__stutter_bits.wav"
             io.write_audio(temp3, result3)
+            del result3
             outputs.append({
                 "path": str(temp3.name), "category": "granular",
                 "recipe": "stutter_bits", "source": src.name,
                 "tools": ["numpy"],
                 "parameters": {"loop_ms": loop_ms, "max_repeats": max_repeats},
             })
+
+        del audio
+        gc.collect()
 
     return outputs
 
@@ -289,11 +318,13 @@ def bitrot_dirt(source_paths: list[Path], output_dir: Path, chaos: float) -> lis
 
         # 3. Filtered noisy loop
         noise_mix = 0.2 + chaos * 0.6
-        noise = np.random.uniform(-1, 1, audio.shape).astype(np.float64)
+        noise = np.random.uniform(-1, 1, audio.shape).astype(np.float32)
         bp_low = 100.0 + chaos * 200.0
         bp_high = 2000.0 + chaos * 6000.0
         filtered_noise = transforms.bandpass(noise, sr, bp_low, bp_high)
+        del noise
         noisy = audio * (1.0 - noise_mix) + filtered_noise * noise_mix
+        del filtered_noise
         crossfade_len = min(int(sr * 0.02), len(noisy) // 3)
         if crossfade_len > 0:
             fade_up = np.linspace(0, 1, crossfade_len)
@@ -303,12 +334,16 @@ def bitrot_dirt(source_paths: list[Path], output_dir: Path, chaos: float) -> lis
         noisy = io.normalize_peak(noisy)
         temp3 = output_dir / f"{stem}__noisy_loop.wav"
         io.write_audio(temp3, noisy)
+        del noisy
         outputs.append({
             "path": str(temp3.name), "category": "loop",
             "recipe": "noisy_loop", "source": src.name,
             "tools": ["numpy", "scipy"],
             "parameters": {"noise_mix": noise_mix, "bp_low": bp_low, "bp_high": bp_high},
         })
+
+        del audio
+        gc.collect()
 
     return outputs
 
@@ -353,7 +388,7 @@ def pitch_wreckage(source_paths: list[Path], output_dir: Path, chaos: float) -> 
         pitch_env = (
             np.sin(2 * np.pi * mod_rate * t) +
             0.3 * np.sin(2 * np.pi * mod_rate * 3.7 * t) +
-            0.1 * np.random.randn(n)
+            0.1 * np.random.randn(n).astype(np.float32)
         )
         pitch_env = drift_range * (pitch_env / (np.max(np.abs(pitch_env)) + 1e-10))
         speed = 2.0 ** (pitch_env / 12.0)
@@ -362,10 +397,12 @@ def pitch_wreckage(source_paths: list[Path], output_dir: Path, chaos: float) -> 
         drift_out = np.zeros_like(audio)
         for ch in range(audio.shape[1]):
             drift_out[:, ch] = np.interp(phase, np.arange(n), audio[:, ch])
+        temp3 = output_dir / f"{stem}__pitch_drift.wav"
+        drift_out = np.asarray(drift_out, dtype=np.float32)
         drift_out = io.apply_fades(drift_out, sr, 10)
         drift_out = io.normalize_peak(drift_out)
-        temp3 = output_dir / f"{stem}__pitch_drift.wav"
         io.write_audio(temp3, drift_out)
+        del drift_out
         outputs.append({
             "path": str(temp3.name), "category": "oddity",
             "recipe": "pitch_drift", "source": src.name,
@@ -374,6 +411,9 @@ def pitch_wreckage(source_paths: list[Path], output_dir: Path, chaos: float) -> 
         })
 
         wav_src.unlink(missing_ok=True)
+
+        del audio
+        gc.collect()
 
     return outputs
 
@@ -418,6 +458,9 @@ def loop_extractor(source_paths: list[Path], output_dir: Path, chaos: float) -> 
 
         wav_src.unlink(missing_ok=True)
 
+        del audio
+        gc.collect()
+
     return outputs
 
 
@@ -434,6 +477,7 @@ def impact_riser_mutator(source_paths: list[Path], output_dir: Path, chaos: floa
         audio_rev = transforms.reverse(audio, sr)
         fade_ms = 100 + int(chaos * 400)
         riser_audio = io.fade_in(audio_rev, sr, fade_ms)
+        del audio_rev
         sweep_start = 100.0 + chaos * 100.0
         sweep_end = 2000.0 + chaos * 6000.0
         n = len(riser_audio)
@@ -454,13 +498,17 @@ def impact_riser_mutator(source_paths: list[Path], output_dir: Path, chaos: floa
                 mask = 1.0 / (1.0 + ((f - cf) / (bw / 2.0)) ** 2) if bw > 0 else np.ones_like(f)
                 Zxx[:, i] *= mask
             _, left = scipy_signal.istft(Zxx, fs=sr)
-            riser_out = np.zeros((n, 2))
+            del Zxx
+            left = np.asarray(left, dtype=np.float32)
+            riser_out = np.zeros((n, 2), dtype=np.float32)
             riser_out[:min(n, len(left)), 0] = left[:min(n, len(left))]
             riser_out[:min(n, len(left)), 1] = left[:min(n, len(left))]
+            del left
             riser_out = transforms.soft_clip(riser_out, sr, drive=chaos * 0.3)
             riser_out = io.normalize_peak(riser_out)
             temp1 = output_dir / f"{stem}__riser.wav"
             io.write_audio(temp1, riser_out)
+            del riser_out
             outputs.append({
                 "path": str(temp1.name), "category": "ambience",
                 "recipe": "riser", "source": src.name,
@@ -476,6 +524,7 @@ def impact_riser_mutator(source_paths: list[Path], output_dir: Path, chaos: floa
         audio_impact = transforms.soft_clip(audio_impact, sr, drive=0.2 + chaos * 0.4)
         audio_impact = io.normalize_peak(audio_impact)
         io.write_audio(temp2, audio_impact)
+        del audio_impact
         outputs.append({
             "path": str(temp2.name), "category": "one_shot",
             "recipe": "impact", "source": src.name,
@@ -483,21 +532,30 @@ def impact_riser_mutator(source_paths: list[Path], output_dir: Path, chaos: floa
             "parameters": {"semitones": semitones},
         })
 
-        # 3. Transient smear (reverb)
+        # 3. Transient smear (reverb) — cap input to 30s for memory safety
+        smear_max_len = min(len(audio), int(sr * 30))
+        smear_input = audio[:smear_max_len] if len(audio) > smear_max_len else audio
         reverb_time = 0.5 + chaos * 2.5
-        ir_length = min(int(sr * reverb_time), len(audio))
+        ir_length = min(int(sr * reverb_time), len(smear_input))
         decay = np.exp(-np.linspace(0, 5, ir_length)) if ir_length > 0 else np.array([])
-        noise_ir = np.random.randn(ir_length) * decay if ir_length > 0 else np.array([])
+        noise_ir = np.random.randn(ir_length).astype(np.float32) * decay if ir_length > 0 else np.array([])
         if len(noise_ir) > 0:
             noise_ir = noise_ir / (np.max(np.abs(noise_ir)) + 1e-12) * 0.3
-            left = scipy_signal.fftconvolve(audio[:, 0], noise_ir, mode="full")[:len(audio)]
-            right = scipy_signal.fftconvolve(audio[:, 1], noise_ir, mode="full")[:len(audio)]
+            left = scipy_signal.fftconvolve(smear_input[:, 0], noise_ir, mode="full")[:len(smear_input)]
+            right = scipy_signal.fftconvolve(smear_input[:, 1], noise_ir, mode="full")[:len(smear_input)]
+            del noise_ir
+            left = np.asarray(left, dtype=np.float32)
+            right = np.asarray(right, dtype=np.float32)
             wet = 0.3 + chaos * 0.5
-            smeared = audio * (1 - wet) + np.column_stack([left, right]) * wet
+            smeared = smear_input * (1 - wet) + np.column_stack([left, right]) * wet
+            del left, right
+            if smear_max_len < len(audio):
+                del smear_input
             smeared = io.normalize_peak(smeared)
             smeared = io.fade_out(smeared, sr, 50)
             temp3 = output_dir / f"{stem}__smear.wav"
             io.write_audio(temp3, smeared)
+            del smeared
             outputs.append({
                 "path": str(temp3.name), "category": "one_shot",
                 "recipe": "smear", "source": src.name,
@@ -506,6 +564,9 @@ def impact_riser_mutator(source_paths: list[Path], output_dir: Path, chaos: floa
             })
 
         wav_src.unlink(missing_ok=True)
+
+        del audio
+        gc.collect()
 
     return outputs
 

@@ -30,6 +30,7 @@ class TestReadWrite:
             audio, sr = io.read_audio(path)
             assert sr == SAMPLE_RATE
             assert audio.shape[1] == 2
+            assert audio.dtype == np.float32
         finally:
             path.unlink(missing_ok=True)
 

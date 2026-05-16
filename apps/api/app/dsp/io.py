@@ -22,20 +22,20 @@ class AudioError(Exception):
 
 
 def read_audio(path: str | Path) -> tuple[np.ndarray, int]:
-    """Read audio file. Returns (float64 array of shape (samples, channels), sample_rate).
+    """Read audio file. Returns (float32 array of shape (samples, channels), sample_rate).
     Promotes mono to stereo."""
-    audio, sr = sf.read(str(path), always_2d=False)
+    audio, sr = sf.read(str(path), always_2d=False, dtype="float32")
     if audio.ndim == 1:
         audio = np.column_stack([audio, audio])
     elif audio.shape[1] > 2:
         audio = audio[:, :2]
-    return audio.astype(np.float64), sr
+    return audio, sr
 
 
 def write_audio(path: str | Path, audio: np.ndarray, sr: int = SAMPLE_RATE) -> Path:
-    """Write float64 numpy array to 48kHz 16-bit WAV with peak normalization."""
+    """Write float32 numpy array to 48kHz 16-bit WAV with peak normalization."""
     audio = normalize_peak(audio, TARGET_DBFS)
-    sf.write(str(path), audio, sr, subtype="PCM_16")
+    sf.write(str(path), np.asarray(audio, dtype=np.float32), sr, subtype="PCM_16")
     return Path(path)
 
 
