@@ -18,7 +18,16 @@
   <img src="https://img.shields.io/badge/Web_Audio-FF6B6B?logo=audacity&logoColor=white" alt="Web Audio" />
 </p>
 
-  https://github.com/achuthanmukundan00/Resample-Lab/blob/main/docs/assets/demo.webm
+<p align="center">
+  <video
+    src="https://raw.githubusercontent.com/achuthanmukundan00/Resample-Lab/main/docs/assets/demo.webm"
+    controls
+    muted
+    width="100%"
+  >
+    Your browser does not support the video tag.
+  </video>
+</p>
 
 </div>
 
