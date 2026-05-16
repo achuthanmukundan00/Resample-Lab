@@ -79,11 +79,11 @@ export default function Home() {
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <img
               src="/wyt-logo.png"
               alt=""
-              className="h-10 w-10 object-contain opacity-85"
+              className="h-20 w-20 object-contain opacity-85"
             />
             <h1 className="text-xl font-semibold tracking-tight">
               <span className="text-foreground">Resample</span>
