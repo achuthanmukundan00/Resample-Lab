@@ -17,6 +17,10 @@
   <img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Web_Audio-FF6B6B?logo=audacity&logoColor=white" alt="Web Audio" />
 </p>
+
+<p align="center">
+  [demo.webm](https://github.com/user-attachments/assets/5ee5a0a9-e7ee-4973-850d-36683016aedb)
+</p>
 </div>
 
 <p align="center">
@@ -28,14 +32,6 @@
 </p>
 
 <br />
-
----
-
-<p align="center">
-  <video src="https://github.com/achuthanmukundan00/Resample-Lab/raw/main/docs/assets/demo.webm" controls width="100%">
-  Your browser does not support the video tag.
- </video>
-</p>
 
 ---
 
