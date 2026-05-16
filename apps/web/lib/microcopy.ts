@@ -9,6 +9,16 @@ export const MICRO_MESSAGES = [
   "scattering samples…",
   "crushing bits…",
   "warping time…",
+  "layering drive chains…",
+  "sweeping filters…",
+  "degrading with tape wow…",
+  "finding loop candidates…",
+  "crossfading loop boundaries…",
+  "reversing and smearing…",
+  "saturating the glue…",
+  "scoring energy windows…",
+  "widening stereo field…",
+  "baking bitcrushed artifacts…",
 ]
 
 export const CHAOS_LABELS = [
