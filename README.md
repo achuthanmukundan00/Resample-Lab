@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  [demo.webm](https://github.com/user-attachments/assets/5ee5a0a9-e7ee-4973-850d-36683016aedb)
+  [demo.webm](https://github.com/achuthanmukundan00/Resample-Lab/blob/main/docs/assets/demo.webm)
 </p>
 </div>
 
