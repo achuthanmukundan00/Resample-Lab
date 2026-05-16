@@ -132,7 +132,7 @@ class TestPackLifecycleEndpoint:
     def test_download_not_completed(self):
         state = pack_store.create(PackState(pack_id="api-dl-fail", preset="granular_shards", chaos=0.5))
         response = client.get(f"/api/packs/{state.pack_id}/download")
-        assert response.status_code == 400
+        assert response.status_code == 425  # Too Early
 
     def test_download_nonexistent(self):
         response = client.get("/api/packs/nonexistent/download")

@@ -13,7 +13,7 @@ export default function PresetCard({ preset, isSelected, onSelect }: PresetCardP
   return (
     <button
       onClick={() => onSelect(preset.id)}
-      className={`text-left p-4 rounded-xl border transition-all ${
+      className={`text-left p-4 rounded-lg border transition-all ${
         isSelected
           ? 'border-accent bg-accent-dim/10 shadow-lg shadow-accent-dim/10'
           : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600 hover:bg-zinc-800/40'

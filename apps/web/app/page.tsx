@@ -76,14 +76,14 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-12 space-y-8">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <img
               src="/wyt-logo.png"
               alt=""
-              className="h-6 w-6 object-contain opacity-70"
+              className="h-10 w-10 object-contain opacity-85"
             />
             <h1 className="text-xl font-semibold tracking-tight">
               <span className="text-foreground">Resample</span>
@@ -132,9 +132,6 @@ export default function Home() {
         {/* Chaos + Format */}
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <h2 className="text-xs font-medium uppercase tracking-wider text-accent mb-3">
-              Chaos
-            </h2>
             <ChaosSlider value={chaos} onChange={setChaos} />
           </div>
           <div>
@@ -151,7 +148,7 @@ export default function Home() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-xl border border-accent-dim/50 bg-accent-dim/10 p-3">
+          <div className="rounded-lg border border-accent-dim/50 bg-accent-dim/10 p-3">
             <p className="text-sm text-accent">{error}</p>
           </div>
         )}

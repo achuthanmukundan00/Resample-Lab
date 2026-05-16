@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PackStatusResponse } from '@/lib/types'
 import { api } from '@/lib/api'
 import { MICRO_MESSAGES } from '@/lib/microcopy'
+
+const POLL_TIMEOUT_MS = 60_000
 
 interface PackStatusCardProps {
   packId: string
@@ -14,20 +16,28 @@ export default function PackStatusCard({ packId, onComplete }: PackStatusCardPro
   const [status, setStatus] = useState<PackStatusResponse | null>(null)
   const [microIndex, setMicroIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const startTime = useRef(Date.now())
 
   useEffect(() => {
     let cancelled = false
+    startTime.current = Date.now()
 
     const poll = async () => {
+      if (cancelled) return
+
+      // Timeout check — if the backend never completes, stop polling
+      if (Date.now() - startTime.current > POLL_TIMEOUT_MS) {
+        setError(`Pack generation timed out after ${POLL_TIMEOUT_MS / 1000}s. The backend may be busy or unavailable.`)
+        return
+      }
+
       try {
         const s = await api.getPackStatus(packId)
         if (cancelled) return
         setStatus(s)
 
         if (s.status === 'completed' || s.status === 'failed') {
-          if (s.status === 'completed') {
-            onComplete(s)
-          }
+          onComplete(s)
           return // stop polling
         }
 
@@ -57,7 +67,7 @@ export default function PackStatusCard({ packId, onComplete }: PackStatusCardPro
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-4">
+      <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-4">
         <p className="text-sm text-red-400">{error}</p>
       </div>
     )
@@ -65,7 +75,7 @@ export default function PackStatusCard({ packId, onComplete }: PackStatusCardPro
 
   if (!status) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 animate-pulse">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 animate-pulse">
         <div className="h-4 w-24 bg-zinc-800 rounded mb-3" />
         <div className="h-2 bg-zinc-800 rounded-full" />
       </div>
@@ -81,7 +91,7 @@ export default function PackStatusCard({ packId, onComplete }: PackStatusCardPro
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
           {status.status}

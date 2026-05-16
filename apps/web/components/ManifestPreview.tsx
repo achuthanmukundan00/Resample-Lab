@@ -12,7 +12,7 @@ export default function ManifestPreview({ manifest }: ManifestPreviewProps) {
   if (!manifest) return null
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 flex items-center justify-between text-xs font-medium text-zinc-400 hover:text-zinc-300 transition-colors"
