@@ -39,9 +39,16 @@ generated/**/*.flac
 uploads/**/*.wav
 uploads/**/*.mp3
 
+# Render-audit outputs
+.render-audit/
+
 # Temp audio processing
 tmp/
 temp/
+
+# Generated demo assets (large binaries — regenerate locally)
+docs/assets/demo.webm
+docs/assets/demo-poster.png
 
 # Accidentally-committed test file
 /test.wav

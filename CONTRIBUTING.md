@@ -22,7 +22,11 @@ The UI (`app/page.tsx`) decodes uploaded audio via `AudioContext.decodeAudioData
 
 1. Write the recipe function in `presets.ts`:
    ```typescript
-   function myPreset(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
+   function myPreset(
+     files: AudioBufferData[],
+     chaos: number,
+     onProgress?: (v: number, msg: string) => void,
+   ): GeneratedSample[] {
      // Use transforms from * as T
      // Ensure stereo: const stereo = ensureStereo(src.channels);
      // Build each output with makeSample(filename, channels, sr, category, description)
@@ -51,7 +55,7 @@ The UI (`app/page.tsx`) decodes uploaded audio via `AudioContext.decodeAudioData
 ```typescript
 // All transforms take Float32Array[] and return new Float32Array[]
 // (no mutation of inputs)
-function transform(channels: Float32Array[], ...params): Float32Array[]
+function transform(channels: Float32Array[], ...params): Float32Array[];
 
 // Filter helpers are classes extending BiquadFilter
 // applyFilter() wraps per-channel instantiation
@@ -59,18 +63,18 @@ function transform(channels: Float32Array[], ...params): Float32Array[]
 
 Transforms at 30,000 ft:
 
-| Group | Functions |
-|-------|-----------|
-| Filters | `lowpass`, `highpass`, `bandpass`, `dcBlock`, `filterSweep` |
-| Dynamics | `softClip`, `normalizePeak`, `ensureSanitary` |
-| Time | `wsolaStretch`, `resample`, `pitchShiftGrain`, `resampleChannels` |
-| Delay | `delayEcho`, `simpleReverb`, `haasEffect` |
-| Degrade | `bitcrush`, `downsample`, `addNoise`, `tapeWow` |
-| Spatial | `stereoWiden`, `haasEffect` |
-| Granular | `sliceAudio`, `fadeIn`, `fadeOut`, `applyFades` |
-| Loop | `findLoopCandidates`, `analyzeWindow`, `scoreLoopCandidate`, `extractLoopWithCrossfade`, `repeatToDuration` |
-| Character | `finalWarm` (HP20 + LP60 + soft clip), `haasEffect` |
-| Utility | `interleave`, `capDuration`, `makeAudioData`, `validateOutput` |
+| Group     | Functions                                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------- |
+| Filters   | `lowpass`, `highpass`, `bandpass`, `dcBlock`, `filterSweep`                                                 |
+| Dynamics  | `softClip`, `normalizePeak`, `ensureSanitary`                                                               |
+| Time      | `wsolaStretch`, `resample`, `pitchShiftGrain`, `resampleChannels`                                           |
+| Delay     | `delayEcho`, `simpleReverb`, `haasEffect`                                                                   |
+| Degrade   | `bitcrush`, `downsample`, `addNoise`, `tapeWow`                                                             |
+| Spatial   | `stereoWiden`, `haasEffect`                                                                                 |
+| Granular  | `sliceAudio`, `fadeIn`, `fadeOut`, `applyFades`                                                             |
+| Loop      | `findLoopCandidates`, `analyzeWindow`, `scoreLoopCandidate`, `extractLoopWithCrossfade`, `repeatToDuration` |
+| Character | `finalWarm` (HP20 + LP60 + soft clip), `haasEffect`                                                         |
+| Utility   | `interleave`, `capDuration`, `makeAudioData`, `validateOutput`                                              |
 
 ---
 
@@ -80,7 +84,7 @@ Bug reports, feature ideas, and questions are all fine. Be specific:
 
 - What you did, what you expected, what happened instead
 - If it's a crash, paste the error
-- If it's a feature request, explain the *why* — what musical problem does it solve?
+- If it's a feature request, explain the _why_ — what musical problem does it solve?
 
 ## Pull Requests
 
@@ -100,7 +104,7 @@ This project is explicitly **non-AI** in its core processing — raw DSP math, n
 
 **Don't submit clanker slop.**
 
-If you use an LLM to write code, that's fine, but *you* are responsible for what it produces. Review it. Understand it. Make sure it's correct, necessary, and follows the project's style. PRs that are obviously vomited out with no human review will be closed.
+If you use an LLM to write code, that's fine, but _you_ are responsible for what it produces. Review it. Understand it. Make sure it's correct, necessary, and follows the project's style. PRs that are obviously vomited out with no human review will be closed.
 
 Good AI-assisted contribution: you describe what needs to change, the tool generates a draft, you clean it up, test it, and submit something thoughtful.
 

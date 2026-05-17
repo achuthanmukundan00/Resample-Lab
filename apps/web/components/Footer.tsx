@@ -3,7 +3,8 @@ export default function Footer() {
     <footer className="border-t border-zinc-800 py-6 mt-auto">
       <div className="max-w-2xl mx-auto px-4 flex flex-col items-center gap-3 text-xs text-zinc-600">
         <p>
-          <span className="text-accent">Resample</span>-Lab — Browser-local audio mutation lab
+          <span className="text-accent">Resample</span>-Lab — Browser-local
+          audio mutation lab
         </p>
         <p>Non-AI DSP. Your files never leave your computer.</p>
         <a
@@ -19,5 +20,5 @@ export default function Footer() {
         </a>
       </div>
     </footer>
-  )
+  );
 }

@@ -4,5 +4,5 @@ export default function LocalFirstBadge() {
       <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-sm shadow-accent-dim/50" />
       Local-First — No Cloud Upload
     </div>
-  )
+  );
 }

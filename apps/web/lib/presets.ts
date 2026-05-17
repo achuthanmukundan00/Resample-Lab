@@ -1,10 +1,11 @@
-import { Preset } from "@/lib/types"
+import { Preset } from "@/lib/types";
 
 export const PRESETS: Preset[] = [
   {
     id: "ambient_stretch",
     name: "Ambient Stretch Lab",
-    description: "Long stretched pads, reverse smear, ghost textures, driven textures, reverse reverb wash",
+    description:
+      "Cinematic stretched textures: cathedral beds, toxic air, doom choir drift, submerged pads, reverse bloom — all with tape warmth and hall reverb",
     tools: ["ffmpeg", "numpy", "scipy"],
     output_count: 5,
     categories: ["ambience", "ambience", "ambience", "ambience", "ambience"],
@@ -12,34 +13,46 @@ export const PRESETS: Preset[] = [
   {
     id: "ghost_reverse",
     name: "Ghost Reverse Lab",
-    description: "Reverse tails with echo, bandpassed ghost hits, filtered pre-echoes, distorted pre-impacts",
+    description:
+      "Reverse tails, pre-impact sucks, ghost swells, diffusion delay clouds, haunted metallic room tails with bloom reverbs",
     tools: ["ffmpeg", "numpy", "scipy"],
     output_count: 4,
-    categories: ["ambience", "oddity", "oddity", "one-shot"],
+    categories: ["ambience", "ambience", "oddity", "ambience"],
   },
   {
     id: "granular_shards",
     name: "Granular Shards",
-    description: "Micro-chopped sequences, bitcrushed shards, pitch-shifted clouds, reverb throws, glitch bits, stutter repeats, noise shards, speed variants",
+    description:
+      "Stereo shrapnel loops, bitcrushed shards, particle clouds, frozen textures, delay swarms, reverb blooms, pitch clouds, glitch bits — cloud + shard modes",
     tools: ["numpy", "scipy"],
     output_count: 10,
     categories: [
-      "granular", "granular", "granular", "granular", "granular",
-      "granular", "granular", "granular", "granular", "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
+      "granular",
     ],
   },
   {
     id: "bitrot_dirt",
     name: "Bitrot Dirt",
-    description: "Heavily crushed textures, degraded wow/flutter, broken degraded loops, saturated noise artifacts",
+    description:
+      "Rotted room loops, cassette collapse, speaker cone tear, bitcrushed tails — musical degradation with tape loss and metallic reverb",
     tools: ["numpy", "scipy"],
     output_count: 4,
-    categories: ["oddity", "oddity", "loop", "oddity"],
+    categories: ["oddity", "oddity", "oddity", "oddity"],
   },
   {
     id: "pitch_wreckage",
     name: "Pitch Wreckage",
-    description: "Saturated octave-down monsters, bandpassed octave-up insects, unstable pitch drift, dual-layer pitch distortion",
+    description:
+      "Sub beast layers, glass octave tails, detuned metal pairs, falling pitch smears — pitch mutation with convolution wash and tape processing",
     tools: ["ffmpeg", "numpy"],
     output_count: 4,
     categories: ["oddity", "oddity", "oddity", "oddity"],
@@ -47,28 +60,39 @@ export const PRESETS: Preset[] = [
   {
     id: "loop_extractor",
     name: "Loop Extractor",
-    description: "Clean crossfaded loops, degraded loops with bitcrush, ghost loops with reverb, driven loops with saturation",
+    description:
+      "Clean loops, dirty room loops, delayed loops, ambient loops, one-shot tail extraction — heuristic loop finding with finishing polish",
     tools: ["ffmpeg", "numpy", "scipy"],
-    output_count: 4,
-    categories: ["loop", "loop", "loop", "loop"],
+    output_count: 5,
+    categories: ["loop", "loop", "loop", "loop", "one-shot"],
   },
   {
     id: "impact_riser",
     name: "Impact / Riser Mutator",
-    description: "Reversed risers with filter sweeps, pitched impacts with tails, transient smear reverbs, long filter sweep risers",
+    description:
+      "Doom risers, pressure drops, metal impacts, reverse slams, sub collapses — cinematic impact design with filter sweeps, convolution, and limiting",
     tools: ["ffmpeg", "numpy", "scipy"],
-    output_count: 4,
-    categories: ["ambience", "one-shot", "one-shot", "ambience"],
+    output_count: 5,
+    categories: ["ambience", "one-shot", "one-shot", "one-shot", "one-shot"],
   },
   {
     id: "chaos_pack",
     name: "Chaos Pack",
-    description: "Curated mix: ambience, ghost hit, granular shards, degraded loop, riser, pitch oddity — maximum entropy",
+    description:
+      "Curated multi-recipe: cathedral bed, haunted ghost, particle cloud, delay swarm, dirty loop, doom riser, sub beast — seven flavors of controlled entropy",
     tools: ["ffmpeg", "numpy", "scipy"],
     output_count: 7,
-    categories: ["ambience", "oddity", "granular", "granular", "loop", "ambience", "oddity"],
+    categories: [
+      "ambience",
+      "oddity",
+      "granular",
+      "granular",
+      "loop",
+      "ambience",
+      "oddity",
+    ],
   },
-]
+];
 
 export function getPresetIcon(id: string): string {
   const icons: Record<string, string> = {
@@ -80,6 +104,6 @@ export function getPresetIcon(id: string): string {
     loop_extractor: "○",
     impact_riser: "▲",
     chaos_pack: "◆",
-  }
-  return icons[id] || "♪"
+  };
+  return icons[id] || "♪";
 }

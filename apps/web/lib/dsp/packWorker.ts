@@ -4,7 +4,11 @@
  */
 
 import type { AudioBufferData, PackManifest, WorkerRequest } from "./types";
-import { generatePack, PRESET_OUTPUT_COUNTS, PRESET_CATEGORIES } from "./presets";
+import {
+  generatePack,
+  PRESET_OUTPUT_COUNTS,
+  PRESET_CATEGORIES,
+} from "./presets";
 import { encodeWav } from "./wav";
 import { interleave } from "./transforms";
 import { buildZip } from "./zip";
@@ -23,7 +27,13 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         self.postMessage({ type: "progress", value, message });
       };
 
-      const { samples, manifestSamples } = generatePack(files, preset, chaos, reportProgress);
+      const { samples, manifestSamples } = generatePack(
+        files,
+        preset,
+        chaos,
+        reportProgress,
+        e.data.lengthMode,
+      );
 
       reportProgress(0.65, "Building ZIP…");
 

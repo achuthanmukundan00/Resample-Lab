@@ -1,5 +1,9 @@
 /** Write 16-bit PCM WAV from interleaved Float32Array samples. */
-export function encodeWav(samples: Float32Array, sampleRate: number, numChannels: number): ArrayBuffer {
+export function encodeWav(
+  samples: Float32Array,
+  sampleRate: number,
+  numChannels: number,
+): ArrayBuffer {
   const bitDepth = 16;
   const bytesPerSample = bitDepth / 8;
   const blockAlign = numChannels * bytesPerSample;
@@ -8,7 +12,8 @@ export function encodeWav(samples: Float32Array, sampleRate: number, numChannels
   const v = new DataView(buf);
 
   function writeString(offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i));
+    for (let i = 0; i < str.length; i++)
+      v.setUint8(offset + i, str.charCodeAt(i));
   }
 
   writeString(0, "RIFF");

@@ -4,9 +4,11 @@
   "scripts": {
     "dev": "pnpm --filter web dev",
     "lint": "pnpm --filter web lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "demo:record": "node scripts/demo-recorder.mjs"
   },
   "devDependencies": {
+    "playwright": "^1.60.0",
     "prettier": "^3.3.3"
   }
 }

@@ -8,13 +8,13 @@ Source audio and generated output examples for Resample-Lab.
 
 Drop your own WAV/AIFF/FLAC/MP3/M4A/OGG files into `input/` for testing. Good source material:
 
-| Type | Why | Duration |
-|------|-----|----------|
-| **Vocal phrase** | Formant-rich, great for ghost reverses and granular shards | 2–10 s |
-| **Kick drum** | Transient-heavy, perfect for impact risers and pitch wreckage | 0.5–2 s |
-| **Field recording** | Texture-rich, ideal for ambient stretch and bitrot dirt | 10–60 s |
-| **Melodic loop** | Tonal material for loop extraction and pitch drift | 4–16 bars |
-| **Foley / percussion** | Complex transients for granular and stutter effects | 1–5 s |
+| Type                   | Why                                                           | Duration  |
+| ---------------------- | ------------------------------------------------------------- | --------- |
+| **Vocal phrase**       | Formant-rich, great for ghost reverses and granular shards    | 2–10 s    |
+| **Kick drum**          | Transient-heavy, perfect for impact risers and pitch wreckage | 0.5–2 s   |
+| **Field recording**    | Texture-rich, ideal for ambient stretch and bitrot dirt       | 10–60 s   |
+| **Melodic loop**       | Tonal material for loop extraction and pitch drift            | 4–16 bars |
+| **Foley / percussion** | Complex transients for granular and stutter effects           | 1–5 s     |
 
 ## Generated Outputs
 

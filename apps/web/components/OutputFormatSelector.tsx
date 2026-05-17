@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
 interface OutputFormatSelectorProps {
-  value: string
-  onChange: (value: string) => void
-  formats: string[]
+  value: string;
+  onChange: (value: string) => void;
+  formats: string[];
 }
 
 export default function OutputFormatSelector({
@@ -28,5 +28,5 @@ export default function OutputFormatSelector({
         ))}
       </select>
     </div>
-  )
+  );
 }

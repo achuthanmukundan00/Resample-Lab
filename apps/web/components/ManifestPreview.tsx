@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
+import { useState } from "react";
 
 interface ManifestPreviewProps {
-  manifest: Record<string, unknown> | null
+  manifest: Record<string, unknown> | null;
 }
 
 export default function ManifestPreview({ manifest }: ManifestPreviewProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
-  if (!manifest) return null
+  if (!manifest) return null;
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden">
@@ -20,7 +20,7 @@ export default function ManifestPreview({ manifest }: ManifestPreviewProps) {
         <span>Manifest</span>
         <span
           className="transition-transform duration-200 inline-block"
-          style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+          style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
         >
           ›
         </span>
@@ -31,5 +31,5 @@ export default function ManifestPreview({ manifest }: ManifestPreviewProps) {
         </pre>
       )}
     </div>
-  )
+  );
 }

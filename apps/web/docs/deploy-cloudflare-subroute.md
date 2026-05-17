@@ -52,7 +52,7 @@ the logo.
 **Critical**: The build output stays at `apps/web/out/` root — NOT in an
 `out/rlab/` subdirectory. The files `out/index.html`, `out/wyt-logo.png`,
 and `out/_next/static/chunks/*` remain exactly where they are. Only the
-URLs *within* the HTML change. The Cloudflare Worker (set up in Step 3)
+URLs _within_ the HTML change. The Cloudflare Worker (set up in Step 3)
 must strip `/rlab` when proxying so the upstream Pages origin serves
 from its root. See the explanation below.
 
@@ -65,9 +65,9 @@ npx wrangler pages deploy out --branch main
 Or set `NEXT_PUBLIC_BASE_PATH` in the Cloudflare dashboard under
 **Pages → resample-lab → Settings → Environment variables → Production**:
 
-| Variable name            | Value  |
-|--------------------------|--------|
-| `NEXT_PUBLIC_BASE_PATH`  | `/rlab`|
+| Variable name           | Value   |
+| ----------------------- | ------- |
+| `NEXT_PUBLIC_BASE_PATH` | `/rlab` |
 
 Then trigger a redeploy from the dashboard or via `git push`.
 
@@ -87,7 +87,9 @@ export default {
     }
 
     if (url.pathname.startsWith("/rlab/")) {
-      const frontendOrigin = new URL("https://YOUR-RESAMPLE-LAB-PAGES-DOMAIN.pages.dev");
+      const frontendOrigin = new URL(
+        "https://YOUR-RESAMPLE-LAB-PAGES-DOMAIN.pages.dev",
+      );
 
       const target = new URL(request.url);
       target.protocol = frontendOrigin.protocol;
@@ -187,11 +189,11 @@ root of `out/`, not under `out/rlab/`.
 
 After whichever option(s) you deploy, verify in the browser:
 
-| URL | Expectation |
-|-----|-------------|
-| `https://watchyourtemper.com/rlab/` | App loads, worker JS loads (check Network tab) |
-| `https://watchyourtemper.com/rlab/docs` | Docs page loads |
-| `https://resample.watchyourtemper.com/` | App loads at root (if using Option B) |
+| URL                                     | Expectation                                    |
+| --------------------------------------- | ---------------------------------------------- |
+| `https://watchyourtemper.com/rlab/`     | App loads, worker JS loads (check Network tab) |
+| `https://watchyourtemper.com/rlab/docs` | Docs page loads                                |
+| `https://resample.watchyourtemper.com/` | App loads at root (if using Option B)          |
 
 Upload an audio file, generate a pack, and download the ZIP — the entire
 pipeline must work locally with no failed network requests.

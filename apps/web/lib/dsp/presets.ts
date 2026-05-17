@@ -1,11 +1,43 @@
 /**
  * Preset recipe implementations for browser-local processing.
- * All operations use Float32Array channels.
+ *
+ * Architecture per preset:
+ *   source → mutation → tape/tone → delay/reverb → finish rack → output
+ *
+ * Chaos is mapped into lanes per preset (mutation, degradation, space,
+ * modulation, instability, finish, stereo, tail).
+ *
+ * Every output passes through finishSample() for DC block, fades,
+ * normalization, and optional limiting.
  */
 
 import type { AudioBufferData, GeneratedSample, SampleCategory } from "./types";
 import * as T from "./transforms";
 import { DSP } from "./constants";
+import {
+  finishSample,
+  mapChaosToLanes,
+  type ChaosLane,
+  LengthMode,
+  getLengthLimits,
+} from "./finish";
+import { applyTape, TapeProfile } from "./tape";
+import { pingPongDelay, diffusionDelay, reverseDelay } from "./delay";
+import {
+  darkRoom,
+  modulatedHall,
+  dirtyMetallic,
+  reverseBloom,
+  convolutionSmear,
+} from "./reverb";
+import {
+  granularCloud,
+  frozenTexture,
+  grainReverbBloom,
+  granularDelaySwarm,
+} from "./granular";
+
+// ── RNG and helpers ──────────────────────────────────────────────────
 
 type Rng = { next: () => number };
 
@@ -32,12 +64,21 @@ function ensureStereo(channels: Float32Array[]): Float32Array[] {
   return c;
 }
 
+function hashCode(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++)
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return h;
+}
+
+// ── Shared output builder ────────────────────────────────────────────
+
 function makeSample(
   name: string,
   channels: Float32Array[],
   sampleRate: number,
   category: SampleCategory,
-  description: string
+  description: string,
 ): GeneratedSample | null {
   const stereo = ensureStereo(channels);
 
@@ -58,227 +99,466 @@ function makeSample(
   };
 }
 
-// ---------- Ambient Stretch Lab ----------
+// ── Chaos lane mappings per preset ───────────────────────────────────
 
-function ambientStretchLab(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
+const CHAOS_MAPS: Record<string, Partial<Record<ChaosLane, number>>> = {
+  ambient_stretch: {
+    mutation: 0.6,
+    degradation: 0.2,
+    space: 1.2,
+    modulation: 0.8,
+    instability: 0.3,
+    finish: 0.3,
+    stereo: 0.7,
+    tail: 1.0,
+  },
+  ghost_reverse: {
+    mutation: 0.7,
+    degradation: 0.3,
+    space: 0.9,
+    modulation: 0.5,
+    instability: 0.4,
+    finish: 0.2,
+    stereo: 0.5,
+    tail: 0.8,
+  },
+  granular_shards: {
+    mutation: 0.8,
+    degradation: 0.4,
+    space: 0.6,
+    modulation: 0.7,
+    instability: 0.6,
+    finish: 0.2,
+    stereo: 0.8,
+    tail: 0.4,
+  },
+  bitrot_dirt: {
+    mutation: 0.5,
+    degradation: 1.3,
+    space: 0.3,
+    modulation: 0.8,
+    instability: 1.0,
+    finish: 0.1,
+    stereo: 0.3,
+    tail: 0.2,
+  },
+  pitch_wreckage: {
+    mutation: 1.0,
+    degradation: 0.6,
+    space: 0.4,
+    modulation: 0.9,
+    instability: 1.0,
+    finish: 0.15,
+    stereo: 0.5,
+    tail: 0.3,
+  },
+  loop_extractor: {
+    mutation: 0.3,
+    degradation: 0.6,
+    space: 0.4,
+    modulation: 0.3,
+    instability: 0.2,
+    finish: 0.3,
+    stereo: 0.3,
+    tail: 0.2,
+  },
+  impact_riser: {
+    mutation: 0.7,
+    degradation: 0.3,
+    space: 1.0,
+    modulation: 0.6,
+    instability: 0.5,
+    finish: 0.3,
+    stereo: 0.8,
+    tail: 1.0,
+  },
+  chaos_pack: {
+    mutation: 0.7,
+    degradation: 0.7,
+    space: 0.7,
+    modulation: 0.7,
+    instability: 0.7,
+    finish: 0.3,
+    stereo: 0.7,
+    tail: 0.6,
+  },
+};
+
+// ── Length mode per preset ───────────────────────────────────────────
+
+const LENGTH_MODES: Record<string, LengthMode> = {
+  ambient_stretch: "absurd",
+  ghost_reverse: "long",
+  granular_shards: "medium",
+  bitrot_dirt: "medium",
+  pitch_wreckage: "medium",
+  loop_extractor: "medium",
+  impact_riser: "long",
+  chaos_pack: "long",
+};
+
+// ── Ambient Stretch Lab ──────────────────────────────────────────────
+
+function ambientStretchLab(
+  files: AudioBufferData[],
+  chaos: number,
+  onProgress?: (v: number, msg: string) => void,
+  lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.ambient_stretch);
+  const limits = getLengthLimits(
+    lengthMode ?? LENGTH_MODES.ambient_stretch,
+    chaos,
+  );
+  const tapeProfile: TapeProfile = chaos > 0.6 ? "degraded" : "cinematic_dark";
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     let stereo = ensureStereo(src.channels);
 
-    // Cap source to 60s so WSOLA stretch doesn't produce absurd intermediate buffers
+    // Cap source for performance
     const maxSourceS = 60;
     const sourceSamples = Math.floor(sr * maxSourceS);
     if (stereo[0].length > sourceSamples) {
-      stereo = [stereo[0].slice(0, sourceSamples), stereo[1].slice(0, sourceSamples)];
+      stereo = [
+        stereo[0].slice(0, sourceSamples),
+        stereo[1].slice(0, sourceSamples),
+      ];
     }
 
-    onProgress?.(0.06, "Stretching bed…");
-
-    // 1. Long stretched bed — WSOLA + reverb + tape wow + lowpass (+ reverse layer)
-    const stretch = 8 + chaos * 12;
-    let bed = T.wsolaStretch(stereo, sr, 1 / stretch);
-    bed = T.capDuration(bed, sr, DSP.MAX_OUTPUT_DURATION_S);
-    bed = T.simpleReverb(bed, sr, 0.4 + chaos * 0.5, 3);
-    bed = T.tapeWow(bed, sr, 0.002 + chaos * 0.004, 3);
-    bed = T.lowpass(bed, sr, Math.max(60, 3000 - chaos * 2000));
-    bed = T.haasEffect(bed, sr);
-    bed = T.finalWarm(bed, sr);
+    // 1. Cathedral bed — long stretch + tape warmth + hall reverb + finishing
+    onProgress?.(0.06, "Stretching cathedral bed…");
+    const stretch = 8 + lanes.mutation * 12;
+    let cathedral = T.wsolaStretch(stereo, sr, 1 / stretch);
+    cathedral = T.capDuration(cathedral, sr, limits.maxOutputS);
+    cathedral = applyTape(cathedral, {
+      profile: tapeProfile,
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    cathedral = modulatedHall(cathedral, sr, {
+      decay: 0.3 + lanes.space * 0.5,
+      modulationDepth: 0.001 + lanes.modulation * 0.004,
+      damping: 0.25 + lanes.degradation * 0.4,
+      mix: 0.3 + lanes.space * 0.4,
+      size: 0.6 + lanes.space * 0.3,
+    });
+    cathedral = finishSample(cathedral, sr, {
+      profile: "warm",
+      stereoWidth: lanes.stereo * 0.5,
+      tailExtendS: limits.tailExtendS,
+      fadeInMs: 200,
+      fadeOutMs: 500,
+    });
     outputs.push(
       makeSample(
-        `${stem}__stretched_bed.wav`,
-        bed,
+        `${stem}__cathedral_bed.wav`,
+        cathedral,
         sr,
         "ambience",
-        `${Math.round(bed[0].length / sr)}s stretched reverb wash (${stretch.toFixed(0)}x)`
-      )
+        `${Math.round(cathedral[0].length / sr)}s cathedral bed (${stretch.toFixed(0)}x stretch)`,
+      ),
     );
 
-    // 2. Reverse smear — resample slow + reverse + delay + reverb
-    let smear = T.resampleChannels(stereo, 4 + chaos * 4);
-    smear = T.reverse(smear);
-    smear = T.capDuration(smear, sr, DSP.MAX_OUTPUT_DURATION_S);
-    smear = T.delayEcho(smear, sr, 150 + chaos * 200, 0.3 + chaos * 0.3, 0.4);
-    smear = T.simpleReverb(smear, sr, 0.3 + chaos * 0.4, 2);
-    smear = T.lowpass(smear, sr, 2000 - chaos * 1200);
-    smear = T.fadeIn(smear, sr, 500);
-    smear = T.finalWarm(smear, sr);
+    // 2. Toxic air — reverse smear + diffusion delay + dark room
+    onProgress?.(0.15, "Toxic air…");
+    let toxic = T.resampleChannels(stereo, 4 + lanes.mutation * 4);
+    toxic = T.reverse(toxic);
+    toxic = T.capDuration(toxic, sr, limits.maxOutputS);
+    toxic = diffusionDelay(toxic, sr, {
+      delayMs: 100 + lanes.modulation * 200,
+      feedback: 0.3 + lanes.space * 0.4,
+      mix: 0.5,
+      diffusion: 0.5 + lanes.space * 0.4,
+    });
+    toxic = darkRoom(toxic, sr, {
+      decay: 0.3 + lanes.space * 0.5,
+      damping: 0.6,
+      mix: 0.4,
+    });
+    toxic = applyTape(toxic, {
+      profile: "warm",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    toxic = finishSample(toxic, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.6,
+      fadeInMs: 300,
+      fadeOutMs: 800,
+    });
     outputs.push(
       makeSample(
-        `${stem}__reverse_smear.wav`,
-        smear,
+        `${stem}__toxic_air.wav`,
+        toxic,
         sr,
         "ambience",
-        `${Math.round(smear[0].length / sr)}s reverse delay smear with lowpass`
-      )
+        `${Math.round(toxic[0].length / sr)}s reverse smear with diffusion delay`,
+      ),
     );
 
-    // 3. Ghost pad — lowpass + reverb + saturation + stereo widen
-    let pad = T.lowpass(stereo, sr, 500 - chaos * 400);
-    pad = T.simpleReverb(pad, sr, 0.5 + chaos * 0.4, 2);
-    pad = T.softClip(pad, 0.2 + chaos * 0.3);
-    pad = T.tapeWow(pad, sr, 0.003, 3 + chaos * 2);
-    pad = T.stereoWiden(pad, 0.3 + chaos * 0.5);
-    pad = T.fadeIn(pad, sr, 300);
-    pad = T.fadeOut(pad, sr, 500);
-    pad = T.haasEffect(pad, sr);
-    pad = T.finalWarm(pad, sr);
+    // 3. Doom choir drift — ghost pad + heavy tape + convolution smear
+    onProgress?.(0.24, "Doom choir drift…");
+    let doom = T.lowpass(stereo, sr, 400 - lanes.degradation * 300);
+    doom = applyTape(doom, {
+      profile: "cinematic_dark",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    doom = convolutionSmear(doom, sr, {
+      decayTimeS: 1 + lanes.space * 2,
+      mix: 0.5,
+    });
+    doom = finishSample(doom, sr, {
+      profile: "warm",
+      stereoWidth: lanes.stereo * 0.7,
+      softClipDrive: 0.2,
+      fadeInMs: 200,
+      fadeOutMs: 400,
+    });
     outputs.push(
       makeSample(
-        `${stem}__ghost_pad.wav`,
-        pad,
+        `${stem}__doom_choir_drift.wav`,
+        doom,
         sr,
         "ambience",
-        `${Math.round(pad[0].length / sr)}s saturated ghost pad with stereo widen`
-      )
+        `${Math.round(doom[0].length / sr)}s doom choir drift with convolution smear`,
+      ),
     );
 
-    // 4. Stretched texture with drive + delay — longer, grittier
-    let tex = T.wsolaStretch(stereo, sr, 1 / (6 + chaos * 10));
-    tex = T.capDuration(tex, sr, DSP.MAX_OUTPUT_DURATION_S);
-    tex = T.delayEcho(tex, sr, 200, 0.25 + chaos * 0.3, 0.35);
-    tex = T.softClip(tex, 0.3 + chaos * 0.5);
-    tex = T.lowpass(tex, sr, 2500 - chaos * 1500);
-    tex = T.stereoWiden(tex, 0.3);
-    tex = T.tapeWow(tex, sr, 0.004, 2);
-    tex = T.fadeIn(tex, sr, 200);
-    tex = T.fadeOut(tex, sr, 300);
-    tex = T.haasEffect(tex, sr);
-    tex = T.normalizePeak(tex, 0.95);
+    // 4. Submerged pad — deep lowpass + hall + sub-heavy tape
+    onProgress?.(0.33, "Submerged pad…");
+    let sub = T.lowpass(stereo, sr, 800 - lanes.degradation * 600);
+    sub = applyTape(sub, {
+      profile: "sub_heavy",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    sub = modulatedHall(sub, sr, {
+      decay: 0.4 + lanes.space * 0.5,
+      modulationDepth: 0.002,
+      damping: 0.4,
+      mix: 0.4 + lanes.space * 0.3,
+      size: 0.8,
+    });
+    sub = finishSample(sub, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.4,
+      fadeInMs: 150,
+      fadeOutMs: 300,
+    });
     outputs.push(
       makeSample(
-        `${stem}__driven_texture.wav`,
-        tex,
+        `${stem}__submerged_pad.wav`,
+        sub,
         sr,
         "ambience",
-        `${Math.round(tex[0].length / sr)}s driven stretched texture with delay`
-      )
+        `${Math.round(sub[0].length / sr)}s submerged pad with sub-heavy tape`,
+      ),
     );
 
-    // 5. Reverse reverb wash — heavy reverb on reversed signal
-    let wash = T.reverse(stereo);
-    wash = T.simpleReverb(wash, sr, 0.6 + chaos * 0.3, 3);
-    wash = T.reverse(wash);
-    wash = T.capDuration(wash, sr, DSP.MAX_OUTPUT_DURATION_S);
-    wash = T.lowpass(wash, sr, 1500 - chaos * 800);
-    wash = T.fadeIn(wash, sr, 1000);
-    wash = T.fadeOut(wash, sr, 1000);
-    wash = T.haasEffect(wash, sr);
-    wash = T.finalWarm(wash, sr);
+    // 5. Reverse bloom long — reverse + bloom reverb + tape warmth
+    onProgress?.(0.42, "Reverse bloom…");
+    let bloom = T.reverse(stereo);
+    bloom = reverseBloom(bloom, sr, {
+      decay: 0.4 + lanes.space * 0.5,
+      damping: 0.5,
+      mix: 0.6 + lanes.space * 0.3,
+    });
+    bloom = T.capDuration(bloom, sr, limits.maxOutputS);
+    bloom = applyTape(bloom, {
+      profile: "warm",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.5,
+    });
+    bloom = finishSample(bloom, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.5,
+      fadeInMs: 500,
+      fadeOutMs: 1000,
+      tailExtendS: limits.tailExtendS,
+    });
     outputs.push(
       makeSample(
-        `${stem}__reverb_wash.wav`,
-        wash,
+        `${stem}__reverse_bloom_long.wav`,
+        bloom,
         sr,
         "ambience",
-        `${Math.round(wash[0].length / sr)}s reverse reverb wash`
-      )
+        `${Math.round(bloom[0].length / sr)}s reverse bloom with warm tape`,
+      ),
     );
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Ghost Reverse Lab ----------
+// ── Ghost Reverse Lab ────────────────────────────────────────────────
 
-function ghostReverseLab(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function ghostReverseLab(
+  files: AudioBufferData[],
+  chaos: number,
+  onProgress?: (v: number, msg: string) => void,
+  lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.ghost_reverse);
+  const limits = getLengthLimits(
+    lengthMode ?? LENGTH_MODES.ghost_reverse,
+    chaos,
+  );
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     const stereo = ensureStereo(src.channels);
 
-    // 1. Classic reverse tail — reverse + delay echo + fade in
-    let revTail = T.reverse(stereo);
-    revTail = T.delayEcho(revTail, sr, 80 + chaos * 200, 0.3 + chaos * 0.5, 0.5);
-    revTail = T.simpleReverb(revTail, sr, 0.2 + chaos * 0.3, 1.5);
-    revTail = T.fadeIn(revTail, sr, 200 + chaos * 300);
-    revTail = T.finalWarm(revTail, sr);
+    // 1. Pre-impact suck — reverse + reverse delay + dark room
+    let preSuck = T.reverse(stereo);
+    preSuck = reverseDelay(preSuck, sr, {
+      delayMs: 80 + lanes.mutation * 200,
+      feedback: 0.3 + lanes.space * 0.4,
+      mix: 0.5,
+    });
+    preSuck = darkRoom(preSuck, sr, {
+      decay: 0.2 + lanes.space * 0.4,
+      damping: 0.7,
+    });
+    preSuck = applyTape(preSuck, {
+      profile: "warm",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    preSuck = finishSample(preSuck, sr, {
+      profile: "gentle",
+      fadeInMs: 100,
+      fadeOutMs: 200,
+      stereoWidth: lanes.stereo * 0.3,
+    });
     outputs.push(
       makeSample(
-        `${stem}__reverse_tail.wav`,
-        revTail,
-        sr,
-        "ambience",
-        `${Math.round(revTail[0].length / sr)}s reverse tail with echo decay`
-      )
-    );
-
-    // 2. Ghost hit — stretch + reverse + bandpass + reverb + saturation
-    let ghost = T.resampleChannels(stereo, 2 + chaos * 2);
-    ghost = T.reverse(ghost);
-    ghost = T.capDuration(ghost, sr, DSP.MAX_OUTPUT_DURATION_S);
-    const center = 600 + chaos * 1400;
-    const q = 1 + chaos * 4;
-    const low = center / (Math.SQRT2 * q);
-    const high = center * Math.SQRT2 * q;
-    ghost = T.bandpass(ghost, sr, Math.max(20, low), Math.min(sr / 2 - 1, high));
-    ghost = T.simpleReverb(ghost, sr, 0.3 + chaos * 0.4, 2);
-    ghost = T.softClip(ghost, 0.2 + chaos * 0.3);
-    ghost = T.fadeIn(ghost, sr, 300);
-    ghost = T.haasEffect(ghost, sr);
-    ghost = T.finalWarm(ghost, sr);
-    outputs.push(
-      makeSample(
-        `${stem}__ghost_hit.wav`,
-        ghost,
-        sr,
-        "oddity",
-        `${Math.round(ghost[0].length / sr)}s bandpassed ghost hit with reverb`
-      )
-    );
-
-    // 3. Filtered pre-echo — reverse + highpass + reverb + pitch drop
-    let pre = T.reverse(stereo);
-    pre = T.highpass(pre, sr, 800 + chaos * 2000);
-    pre = T.simpleReverb(pre, sr, 0.4 + chaos * 0.4, 2);
-    pre = T.tapeWow(pre, sr, 0.003 + chaos * 0.005, 2);
-    pre = T.fadeIn(pre, sr, 400);
-    pre = T.haasEffect(pre, sr);
-    pre = T.finalWarm(pre, sr);
-    outputs.push(
-      makeSample(
-        `${stem}__filtered_pre.wav`,
-        pre,
-        sr,
-        "oddity",
-        `${Math.round(pre[0].length / sr)}s filtered pre-echo with reverb`
-      )
-    );
-
-    // 4. Distorted pre-impact — reverse + drive + space + normalize
-    let imp = T.reverse(stereo);
-    imp = T.softClip(imp, 0.3 + chaos * 0.5);
-    imp = T.delayEcho(imp, sr, 60, 0.3, 0.5);
-    imp = T.simpleReverb(imp, sr, 0.2 + chaos * 0.3, 1);
-    imp = T.lowpass(imp, sr, 3000 - chaos * 1500);
-    imp = T.fadeIn(imp, sr, 100);
-    imp = T.haasEffect(imp, sr);
-    imp = T.normalizePeak(imp, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__distorted_pre.wav`,
-        imp,
+        `${stem}__pre_impact_suck.wav`,
+        preSuck,
         sr,
         "one-shot",
-        `${Math.round(imp[0].length / sr)}s distorted pre-impact`
-      )
+        `${Math.round((preSuck[0].length / sr) * 1000)}ms pre-impact with reverse delay`,
+      ),
+    );
+
+    // 2. Ghost swell long — reverse + stretch + dark room + fade swell
+    let swell = T.resampleChannels(stereo, 2 + lanes.mutation * 3);
+    swell = T.reverse(swell);
+    swell = T.capDuration(swell, sr, limits.maxOutputS);
+    swell = darkRoom(swell, sr, {
+      decay: 0.4 + lanes.space * 0.5,
+      damping: 0.5,
+      mix: 0.5,
+    });
+    swell = applyTape(swell, {
+      profile: "warm",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.5,
+    });
+    swell = finishSample(swell, sr, {
+      profile: "gentle",
+      fadeInMs: 400 + lanes.tail * 800,
+      fadeOutMs: 300,
+      stereoWidth: lanes.stereo * 0.5,
+      tailExtendS: lanes.tail * 1.0,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__ghost_swell_long.wav`,
+        swell,
+        sr,
+        "ambience",
+        `${Math.round(swell[0].length / sr)}s ghost swell with long fade`,
+      ),
+    );
+
+    // 3. Reverse delay cloud — reverse + diffusion + convolution
+    let cloud = T.reverse(stereo);
+    cloud = diffusionDelay(cloud, sr, {
+      delayMs: 80 + lanes.modulation * 150,
+      feedback: 0.25 + lanes.space * 0.4,
+      mix: 0.6,
+      diffusion: 0.7,
+    });
+    cloud = convolutionSmear(cloud, sr, {
+      decayTimeS: 1 + lanes.space * 1.5,
+      mix: 0.4,
+    });
+    cloud = applyTape(cloud, {
+      profile: "subtle",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.3,
+    });
+    cloud = finishSample(cloud, sr, {
+      profile: "gentle",
+      fadeInMs: 200,
+      fadeOutMs: 400,
+      stereoWidth: lanes.stereo * 0.6,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__reverse_delay_cloud.wav`,
+        cloud,
+        sr,
+        "ambience",
+        `${Math.round(cloud[0].length / sr)}s reverse delay diffusion cloud`,
+      ),
+    );
+
+    // 4. Haunted room tail — reverse + dirty metallic + tape degradation
+    let haunted = T.reverse(stereo);
+    haunted = dirtyMetallic(haunted, sr, {
+      decay: 0.3 + lanes.degradation * 0.4,
+      color: 0.3 + lanes.instability * 0.5,
+      mix: 0.5,
+    });
+    haunted = applyTape(haunted, {
+      profile: "degraded",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    haunted = finishSample(haunted, sr, {
+      profile: "gentle",
+      softClipDrive: 0.15,
+      fadeInMs: 150,
+      fadeOutMs: 300,
+      stereoWidth: lanes.stereo * 0.4,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__haunted_room_tail.wav`,
+        haunted,
+        sr,
+        "oddity",
+        `${Math.round(haunted[0].length / sr)}s haunted metallic reverse tail`,
+      ),
     );
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Granular Shards ----------
+// ── Granular Shards ──────────────────────────────────────────────────
 
-function granularShards(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function granularShards(
+  files: AudioBufferData[],
+  chaos: number,
+  _onProgress?: (v: number, msg: string) => void,
+  _lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.granular_shards);
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     const stereo = ensureStereo(src.channels);
     const rng = seededRng(hashCode(stem) + Math.floor(chaos * 1000));
 
-    // Collect grain regions from multiple window sizes for diversity
+    // ── Shard mode (existing) ──
     const winSizes = [40, 80, 120, 200];
     const allGrains: Float32Array[][] = [];
     for (const winMs of winSizes) {
@@ -286,680 +566,1050 @@ function granularShards(files: AudioBufferData[], chaos: number): GeneratedSampl
       allGrains.push(...grains);
     }
 
-    if (allGrains.length === 0) continue;
-
-    // Shuffle global grain pool
-    for (let i = allGrains.length - 1; i > 0; i--) {
-      const j = Math.floor(rng.next() * (i + 1));
-      [allGrains[i], allGrains[j]] = [allGrains[j], allGrains[i]];
-    }
-
-    // Helper to build a grain sequence with processing
     function buildGrainSequence(
       count: number,
-      processGrain: (g: Float32Array[], i: number) => Float32Array[]
+      processGrain: (g: Float32Array[], i: number) => Float32Array[],
     ): Float32Array[] {
+      if (allGrains.length === 0)
+        return [new Float32Array(1), new Float32Array(1)];
+      // Shuffle
+      for (let i = allGrains.length - 1; i > 0; i--) {
+        const j = Math.floor(rng.next() * (i + 1));
+        [allGrains[i], allGrains[j]] = [allGrains[j], allGrains[i]];
+      }
       const selected = allGrains.slice(0, Math.min(count, allGrains.length));
       const processed = selected.map((g, i) => processGrain(g, i));
       const totalLen = processed.reduce((s, g) => s + g[0].length, 0);
-      const result: Float32Array[] = [new Float32Array(totalLen), new Float32Array(totalLen)];
+      const result: Float32Array[] = [
+        new Float32Array(Math.max(1, totalLen)),
+        new Float32Array(Math.max(1, totalLen)),
+      ];
       let offset = 0;
       for (const p of processed) {
         for (let ch = 0; ch < 2; ch++) {
-          for (let i = 0; i < p[ch].length; i++) result[ch][offset + i] = p[ch][i];
+          for (let i = 0; i < p[ch].length; i++)
+            result[ch][offset + i] = p[ch][i];
         }
         offset += p[0].length;
       }
       return T.normalizePeak(result);
     }
 
-    // 1. Clean micro-chop
-    const cleanSeq = buildGrainSequence(16 + Math.floor(chaos * 24), (g) =>
-      T.fadeIn(T.fadeOut(g, sr, 3), sr, 3)
-    );
+    if (allGrains.length > 0) {
+      // 1. Stereo shrapnel loop — micro-chop + stereo widening + tape
+      const shrapnel = buildGrainSequence(
+        16 + Math.floor(lanes.mutation * 24),
+        (g) => T.fadeIn(T.fadeOut(g, sr, 3), sr, 3),
+      );
+      const shrapnelFinal = finishSample(
+        applyTape(shrapnel, {
+          profile: "subtle",
+          sampleRate: sr,
+          chaos: lanes.degradation * 0.3,
+        }),
+        sr,
+        { profile: "gentle", stereoWidth: lanes.stereo * 0.8 },
+      );
+      outputs.push(
+        makeSample(
+          `${stem}__stereo_shrapnel_loop.wav`,
+          shrapnelFinal,
+          sr,
+          "granular",
+          `Stereo micro-shrapnel (${(shrapnelFinal[0].length / sr) | 0}s)`,
+        ),
+      );
+
+      // 2. Bitcrushed shards (preserve legacy style)
+      const crushed = buildGrainSequence(
+        12 + Math.floor(lanes.degradation * 20),
+        (g) => {
+          const out = T.bitcrush(g, 2 + Math.floor(rng.next() * 6));
+          return T.fadeIn(T.fadeOut(out, sr, 2), sr, 2);
+        },
+      );
+      const crushedFinal = finishSample(crushed, sr, { profile: "gentle" });
+      outputs.push(
+        makeSample(
+          `${stem}__crushed_shards.wav`,
+          crushedFinal,
+          sr,
+          "granular",
+          "Bitcrushed micro-grains",
+        ),
+      );
+
+      // 3. Glitch bits
+      const glitch = buildGrainSequence(
+        10 + Math.floor(lanes.instability * 20),
+        (g) => {
+          const out = T.softClip(g, 0.3 + rng.next() * 0.6);
+          return T.fadeIn(T.fadeOut(out, sr, 2), sr, 2);
+        },
+      );
+      const glitchFinal = finishSample(glitch, sr, {
+        profile: "gentle",
+        softClipDrive: 0.2,
+      });
+      outputs.push(
+        makeSample(
+          `${stem}__glitch_bits.wav`,
+          glitchFinal,
+          sr,
+          "granular",
+          "Saturated glitch grain bits",
+        ),
+      );
+    }
+
+    // ── Cloud mode (new) ──
+    const cloudSeed = hashCode(stem) + 777 + Math.floor(chaos * 500);
+
+    // 4. Particle cloud — overlapping grains with pitch spread
+    const particle = granularCloud(stereo, sr, {
+      grainMs: 60 + lanes.mutation * 60,
+      density: 8 + lanes.mutation * 10,
+      pitchRange: lanes.mutation * 12,
+      panSpread: lanes.stereo,
+      reverseProbability: lanes.instability * 0.3,
+      jitter: lanes.instability * 0.4,
+      durationS: 4 + lanes.tail * 4,
+      overlap: 2 + Math.floor(lanes.mutation * 2),
+      seed: cloudSeed,
+    });
+    const particleFinal = finishSample(particle, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.5,
+      fadeInMs: 20,
+      fadeOutMs: 100,
+    });
     outputs.push(
       makeSample(
-        `${stem}__micro_chop.wav`,
-        cleanSeq,
+        `${stem}__particle_cloud.wav`,
+        particleFinal,
         sr,
         "granular",
-        `Clean shuffled micro-grain sequence (${cleanSeq[0].length / sr | 0}s)`
-      )
+        `${Math.round(particleFinal[0].length / sr)}s particle cloud with pitch spread`,
+      ),
     );
 
-    // 2. Bitcrushed shards
-    const crushedSeq = buildGrainSequence(12 + Math.floor(chaos * 20), (g) => {
-      const bits = 2 + Math.floor(rng.next() * 6);
-      let out = T.bitcrush(g, bits);
-      out = T.fadeIn(T.fadeOut(out, sr, 2), sr, 2);
-      return out;
+    // 5. Frozen texture
+    const frozen = frozenTexture(stereo, sr, {
+      freezeStartS: rng.next() * 0.3 * (stereo[0].length / sr),
+      freezeDurationS: 0.3 + lanes.instability * 0.7,
+      outputDurationS: 3 + lanes.tail * 5,
+      grainMs: 50 + lanes.mutation * 50,
+      overlap: 3,
+      jitter: 0.2 + lanes.instability * 0.4,
+      seed: cloudSeed + 1,
     });
-    outputs.push(
-      makeSample(`${stem}__crushed_shards.wav`, crushedSeq, sr, "granular", "Bitcrushed micro-grains")
-    );
-
-    // 3. Pitch-shifted cloud
-    const pitchRange = 4 + chaos * 20;
-    const cloudSeq = buildGrainSequence(8 + Math.floor(chaos * 16), (g) => {
-      const semitones = rng.next() * pitchRange * 2 - pitchRange;
-      let out = T.pitchShiftGrainChannels(g, semitones);
-      out = T.fadeIn(T.fadeOut(out, sr, 5), sr, 5);
-      return out;
+    const frozenFinal = finishSample(frozen, sr, {
+      profile: "gentle",
+      fadeInMs: 100,
+      fadeOutMs: 200,
     });
     outputs.push(
       makeSample(
-        `${stem}__pitch_cloud.wav`,
-        cloudSeq,
+        `${stem}__frozen_texture.wav`,
+        frozenFinal,
         sr,
         "granular",
-        `Pitch-shifted grain cloud (±${pitchRange.toFixed(0)} st)`
-      )
+        `${Math.round(frozenFinal[0].length / sr)}s frozen texture drone`,
+      ),
     );
 
-    // 4. Reverb throw grains
-    const verbSeq = buildGrainSequence(8 + Math.floor(chaos * 12), (g, i) => {
-      let out = T.capDuration(g, sr, 1);
-      out = T.simpleReverb(out, sr, 0.3 + rng.next() * 0.5, 1);
-      out = T.fadeIn(T.fadeOut(out, sr, 5), sr, 5);
-      return out;
+    // 6. Granular delay swarm
+    const swarm = granularDelaySwarm(stereo, sr, {
+      grainMs: 40 + lanes.mutation * 40,
+      density: 8 + lanes.mutation * 8,
+      durationS: 4 + lanes.tail * 4,
+      feedbackAmount: 0.3 + lanes.space * 0.5,
+      delayTimeMs: 100 + lanes.modulation * 200,
+      pitchRange: lanes.mutation * 8,
+      seed: cloudSeed + 2,
+    });
+    const swarmFinal = finishSample(swarm, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.7,
+      fadeInMs: 10,
+      fadeOutMs: 80,
     });
     outputs.push(
-      makeSample(`${stem}__verb_throws.wav`, verbSeq, sr, "granular", "Reverb-throw grain fragments")
+      makeSample(
+        `${stem}__granular_delay_swarm.wav`,
+        swarmFinal,
+        sr,
+        "granular",
+        `${Math.round(swarmFinal[0].length / sr)}s delay feedback swarm`,
+      ),
     );
 
-    // 5. Saturated glitch bits
-    const glitchSeq = buildGrainSequence(10 + Math.floor(chaos * 20), (g) => {
-      let out = T.softClip(g, 0.3 + rng.next() * 0.6);
-      out = T.fadeIn(T.fadeOut(out, sr, 2), sr, 2);
-      return out;
+    // 7. Grain reverb bloom
+    const bloom = grainReverbBloom(stereo, sr, {
+      grainMs: 80 + lanes.mutation * 40,
+      density: 6 + lanes.mutation * 6,
+      decayS: 1 + lanes.space * 3,
+      durationS: 4 + lanes.tail * 6,
+      pitchRange: lanes.mutation * 4,
+      panSpread: lanes.stereo * 0.8,
+      seed: cloudSeed + 3,
+    });
+    const bloomFinal = finishSample(bloom, sr, {
+      profile: "warm",
+      fadeInMs: 50,
+      fadeOutMs: 300,
+      tailExtendS: lanes.tail * 0.5,
     });
     outputs.push(
-      makeSample(`${stem}__glitch_bits.wav`, glitchSeq, sr, "granular", "Saturated glitch grain bits")
+      makeSample(
+        `${stem}__grain_reverb_bloom.wav`,
+        bloomFinal,
+        sr,
+        "granular",
+        `${Math.round(bloomFinal[0].length / sr)}s reverb bloom cloud`,
+      ),
     );
 
-    // 6. Stutter repeat
-    const loopMs = 30 + Math.floor(rng.next() * 100);
-    const loopSamples = Math.floor((sr * loopMs) / 1000);
-    if (loopSamples > 0 && loopSamples < stereo[0].length) {
-      const maxRepeats = 3 + Math.floor(chaos * 20);
-      const chunks: Float32Array[][] = [];
-      for (let pos = 0; pos + loopSamples <= stereo[0].length; pos += loopSamples) {
-        chunks.push(stereo.map((ch) => ch.slice(pos, pos + loopSamples)));
-      }
-      const stutterParts: Float32Array[][] = [];
-      for (const chk of chunks) {
-        const repeats = 1 + Math.floor(rng.next() * maxRepeats);
-        for (let r = 0; r < repeats; r++) {
-          const faded = T.fadeIn(T.fadeOut(chk, sr, 2), sr, 2);
-          stutterParts.push(faded);
+    // 8-10. Legacy-friendly: pitch cloud, verb throws, stutter
+    if (allGrains.length > 0) {
+      const pitchCloud = buildGrainSequence(
+        8 + Math.floor(lanes.mutation * 16),
+        (g) => {
+          const semitones =
+            rng.next() * (4 + lanes.mutation * 20) * 2 -
+            (4 + lanes.mutation * 20);
+          const out = T.pitchShiftGrainChannels(g, semitones);
+          return T.fadeIn(T.fadeOut(out, sr, 5), sr, 5);
+        },
+      );
+      outputs.push(
+        makeSample(
+          `${stem}__pitch_cloud.wav`,
+          finishSample(pitchCloud, sr, { profile: "gentle" }),
+          sr,
+          "granular",
+          `Pitch-shifted grain cloud`,
+        ),
+      );
+
+      const verbThrows = buildGrainSequence(
+        8 + Math.floor(lanes.space * 12),
+        (g) => {
+          let out = T.capDuration(g, sr, 1);
+          out = darkRoom(out, sr, {
+            decay: 0.3 + lanes.space * 0.5,
+            damping: 0.5,
+            mix: 0.5,
+          });
+          return T.fadeIn(T.fadeOut(out, sr, 5), sr, 5);
+        },
+      );
+      outputs.push(
+        makeSample(
+          `${stem}__verb_throws.wav`,
+          finishSample(verbThrows, sr, { profile: "gentle" }),
+          sr,
+          "granular",
+          "Reverb-throw grain fragments",
+        ),
+      );
+
+      // Stutter
+      const loopMs = 30 + Math.floor(rng.next() * 100);
+      const loopSamples = Math.floor((sr * loopMs) / 1000);
+      if (loopSamples > 0 && loopSamples < stereo[0].length) {
+        const maxRepeats = 3 + Math.floor(lanes.instability * 20);
+        const chunks: Float32Array[][] = [];
+        for (
+          let pos = 0;
+          pos + loopSamples <= stereo[0].length;
+          pos += loopSamples
+        ) {
+          chunks.push(stereo.map((ch) => ch.slice(pos, pos + loopSamples)));
         }
-      }
-      if (stutterParts.length > 0) {
-        const totalStutter = stutterParts.reduce((s, p) => s + p[0].length, 0);
-        const stutterResult: Float32Array[] = [
-          new Float32Array(totalStutter),
-          new Float32Array(totalStutter),
-        ];
-        let soff = 0;
-        for (const p of stutterParts) {
-          for (let ch = 0; ch < 2; ch++) {
-            for (let i = 0; i < p[ch].length; i++) stutterResult[ch][soff + i] = p[ch][i];
+        const stutterParts: Float32Array[][] = [];
+        for (const chk of chunks) {
+          const repeats = 1 + Math.floor(rng.next() * maxRepeats);
+          for (let r = 0; r < repeats; r++) {
+            stutterParts.push(T.fadeIn(T.fadeOut(chk, sr, 2), sr, 2));
           }
-          soff += p[0].length;
         }
-        let stutterFinal = T.tapeWow(stutterResult, sr, 0.003 + chaos * 0.006, 5);
-        stutterFinal = T.normalizePeak(stutterFinal);
-        outputs.push(
-          makeSample(
-            `${stem}__stutter_bits.wav`,
-            stutterFinal,
+        if (stutterParts.length > 0) {
+          const totalStutter = stutterParts.reduce(
+            (s, p) => s + p[0].length,
+            0,
+          );
+          const stutterResult: Float32Array[] = [
+            new Float32Array(Math.max(1, totalStutter)),
+            new Float32Array(Math.max(1, totalStutter)),
+          ];
+          let soff = 0;
+          for (const p of stutterParts) {
+            for (let ch = 0; ch < 2; ch++) {
+              for (let i = 0; i < p[ch].length; i++)
+                stutterResult[ch][soff + i] = p[ch][i];
+            }
+            soff += p[0].length;
+          }
+          const stutterFinal = finishSample(
+            applyTape(stutterResult, {
+              profile: "subtle",
+              sampleRate: sr,
+              chaos: lanes.degradation * 0.3,
+            }),
             sr,
-            "granular",
-            "Stutter repeat grain bits"
-          )
-        );
+            { profile: "gentle", stereoWidth: lanes.stereo * 0.4 },
+          );
+          outputs.push(
+            makeSample(
+              `${stem}__stutter_bits.wav`,
+              stutterFinal,
+              sr,
+              "granular",
+              "Stutter repeat grains",
+            ),
+          );
+        }
       }
-    }
-
-    // 7-8. Noise-layered grains (two variations)
-    for (let v = 0; v < 2; v++) {
-      const noisySeq = buildGrainSequence(6 + Math.floor(chaos * 10), (g) => {
-        let out = T.addNoise(g, 0.05 + rng.next() * 0.15);
-        if (v === 1) out = T.lowpass(out, sr, 2000 + rng.next() * 3000);
-        out = T.fadeIn(T.fadeOut(out, sr, 3), sr, 3);
-        return out;
-      });
-      outputs.push(
-        makeSample(
-          `${stem}__noisy_shards_${v + 1}.wav`,
-          noisySeq,
-          sr,
-          "granular",
-          v === 0 ? "Noise-layered grain shards" : "Filtered noisy grain shards"
-        )
-      );
-    }
-
-    // 9-10. Speed variant cloud (fast + slow)
-    for (let v = 0; v < 2; v++) {
-      const speedRatio = v === 0 ? 0.3 + rng.next() * 0.3 : 2 + rng.next() * 2;
-      const speedSeq = buildGrainSequence(6 + Math.floor(chaos * 8), (g) => {
-        let out = T.resampleChannels(g, speedRatio);
-        if (v === 1) out = T.bitcrush(out, 4 + Math.floor(rng.next() * 4));
-        out = T.fadeIn(T.fadeOut(out, sr, 3), sr, 3);
-        return out;
-      });
-      outputs.push(
-        makeSample(
-          `${stem}__speed_${v === 0 ? "fast" : "slow"}_grains.wav`,
-          speedSeq,
-          sr,
-          "granular",
-          v === 0 ? "Fast speed-shifted grain fragments" : "Slow degraded grain fragments"
-        )
-      );
     }
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Bitrot Dirt ----------
+// ── Bitrot Dirt ──────────────────────────────────────────────────────
 
-function bitrotDirt(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function bitrotDirt(
+  files: AudioBufferData[],
+  chaos: number,
+  _onProgress?: (v: number, msg: string) => void,
+  _lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.bitrot_dirt);
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     const stereo = ensureStereo(src.channels);
 
-    // 1. Heavily crushed — downsample + bitcrush + noise + filter
-    const bits = Math.max(2, 8 - Math.floor(chaos * 6));
-    const factor = 4 + Math.floor(chaos * 12);
-    let crushed = T.downsample(stereo, sr, factor);
-    crushed = T.bitcrush(crushed, bits);
-    crushed = T.addNoise(crushed, 0.01 + chaos * 0.03);
-    crushed = T.bandpass(crushed, sr, 100, 4000 + chaos * 4000);
-    crushed = T.softClip(crushed, 0.2 + chaos * 0.4);
-    crushed = T.normalizePeak(crushed, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__crushed.wav`,
-        crushed,
-        sr,
-        "oddity",
-        `Heavily crushed (${factor}x downsample, ${bits}-bit)`
-      )
-    );
-
-    // 2. Degraded wow — downsample + tape wow + saturation + lowpass
-    let wow = T.downsample(stereo, sr, 2 + Math.floor(chaos * 8));
-    wow = T.tapeWow(wow, sr, 0.004 + chaos * 0.008, 3 + chaos * 3);
-    wow = T.softClip(wow, 0.2 + chaos * 0.5);
-    wow = T.lowpass(wow, sr, 5000 - chaos * 3000);
-    wow = T.addNoise(wow, chaos * 0.015);
-    wow = T.haasEffect(wow, sr);
-    wow = T.normalizePeak(wow, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__degraded_wow.wav`,
-        wow,
-        sr,
-        "oddity",
-        `Degraded wow/flutter texture with saturation (${wow[0].length / sr | 0}s)`
-      )
-    );
-
-    // 3. Broken loop — short candidate + degrade chain
-    const candidates = T.findLoopCandidates(stereo, sr, { maxCandidates: 1, maxDur: 4 });
-    if (candidates.length > 0) {
-      const best = candidates[0];
-      let loop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
-      const targetLen = Math.min(Math.floor(sr * 8), Math.floor(loop[0].length * 4));
-      loop = T.repeatToDuration(loop, targetLen);
-      loop = T.downsample(loop, sr, 2 + Math.floor(chaos * 6));
-      loop = T.bitcrush(loop, 4 + Math.floor(chaos * 4));
-      loop = T.addNoise(loop, chaos * 0.02);
-      loop = T.tapeWow(loop, sr, 0.003 + chaos * 0.006, 4);
-      loop = T.softClip(loop, 0.3 + chaos * 0.5);
-      loop = T.lowpass(loop, sr, 3000 - chaos * 2000);
-      loop = T.fadeIn(loop, sr, 50);
-      loop = T.fadeOut(loop, sr, 100);
-      loop = T.haasEffect(loop, sr);
-      loop = T.normalizePeak(loop, 0.95);
-      outputs.push(
-        makeSample(
-          `${stem}__broken_loop.wav`,
-          loop,
-          sr,
-          "loop",
-          `Degraded broken loop (${(loop[0].length / sr).toFixed(1)}s)`
-        )
-      );
-    }
-
-    // 4. Saturated noise artifact — drive + filter + hard clip
-    let artifact = T.softClip(stereo, 0.5 + chaos * 0.5);
-    artifact = T.bandpass(artifact, sr, 200 + chaos * 300, 3000 + chaos * 5000);
-    artifact = T.addNoise(artifact, 0.05 + chaos * 0.1);
-    artifact = T.dcBlock(artifact, sr);
-    artifact = T.tapeWow(artifact, sr, 0.005 + chaos * 0.008, 6);
-    artifact = T.capDuration(artifact, sr, 30);
-    for (let ch = 0; ch < artifact.length; ch++) {
-      for (let i = 0; i < artifact[ch].length; i++) {
-        artifact[ch][i] = Math.max(-0.85, Math.min(0.85, artifact[ch][i]));
-      }
-    }
-    artifact = T.normalizePeak(artifact, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__noise_artifact.wav`,
-        artifact,
-        sr,
-        "oddity",
-        `Saturated noise artifact (${(artifact[0].length / sr).toFixed(1)}s)`
-      )
-    );
-  }
-  return outputs.filter((s): s is GeneratedSample => s !== null);
-}
-
-// ---------- Pitch Wreckage ----------
-
-function pitchWreckage(files: AudioBufferData[], chaos: number): GeneratedSample[] {
-  const outputs: (GeneratedSample | null)[] = [];
-  for (const src of files) {
-    const stem = src.name.replace(/\.[^.]+$/, "");
-    const sr = src.sampleRate;
-    const stereo = ensureStereo(src.channels);
-
-    // 1. Octave down — resample + saturation + lowpass
-    const sd = -12 - Math.floor(chaos * 12);
-    const downRatio = 2 ** (sd / 12);
-    let down = T.resampleChannels(stereo, 1 / downRatio, stereo[0].length);
-    down = T.softClip(down, 0.2 + chaos * 0.5);
-    down = T.lowpass(down, sr, 2000 - chaos * 1000);
-    down = T.normalizePeak(down, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__octave_down.wav`,
-        down,
-        sr,
-        "oddity",
-        `Saturated octave down (${sd} st)`
-      )
-    );
-
-    // 2. Octave up — resample + bandpass + reverb tail
-    const su = 12 + Math.floor(chaos * 12);
-    const upRatio = 2 ** (su / 12);
-    let up = T.resampleChannels(stereo, 1 / upRatio, stereo[0].length);
-    up = T.bandpass(up, sr, 500, 8000);
-    up = T.simpleReverb(up, sr, 0.2 + chaos * 0.3, 1);
-    up = T.normalizePeak(up, 0.95);
-    outputs.push(
-      makeSample(
-        `${stem}__octave_up.wav`,
-        up,
-        sr,
-        "oddity",
-        `Bandpassed octave up (${su} st) with reverb`
-      )
-    );
-
-    // 3. Unstable pitch drift — time-varying resample + reverb + wow
-    const driftRange = 3 + chaos * 10;
-    const n = stereo[0].length;
-    const modRate = 0.1 + chaos * 0.4;
-    const driftCh = stereo.map((ch) => {
-      const out = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const t = i / sr;
-        const pitchEnv =
-          Math.sin(2 * Math.PI * modRate * t) +
-          0.3 * Math.sin(2 * Math.PI * modRate * 3.7 * t) +
-          0.1 * (Math.random() * 2 - 1);
-        const scaled = driftRange * (pitchEnv / 1.4);
-        const speed = 2 ** (scaled / 12);
-        const phase = i / speed;
-        const idx = Math.floor(phase);
-        const frac = phase - idx;
-        if (idx + 1 < n) out[i] = ch[idx] * (1 - frac) + ch[idx + 1] * frac;
-        else if (idx < n) out[i] = ch[idx];
-      }
-      return out;
+    // 1. Rotted room loop — downsample + bitcrush + tape + room
+    const bits = Math.max(2, 8 - Math.floor(lanes.degradation * 6));
+    const factor = 4 + Math.floor(lanes.degradation * 12);
+    let rotted = T.downsample(stereo, sr, factor);
+    rotted = T.bitcrush(rotted, bits);
+    rotted = applyTape(rotted, {
+      profile: "degraded",
+      sampleRate: sr,
+      chaos: lanes.degradation,
     });
-    let drift = T.simpleReverb(driftCh, sr, 0.2 + chaos * 0.3, 2);
-    drift = T.fadeIn(drift, sr, 50);
-    drift = T.fadeOut(drift, sr, 100);
-    drift = T.haasEffect(drift, sr);
-    drift = T.normalizePeak(drift, 0.95);
+    rotted = darkRoom(rotted, sr, {
+      decay: 0.2 + lanes.space * 0.3,
+      damping: 0.7,
+      mix: 0.3,
+    });
+    rotted = finishSample(rotted, sr, {
+      profile: "degraded",
+      softClipDrive: 0.3,
+      stereoWidth: lanes.stereo * 0.3,
+    });
     outputs.push(
       makeSample(
-        `${stem}__pitch_drift.wav`,
-        drift,
+        `${stem}__rotted_room_loop.wav`,
+        rotted,
         sr,
         "oddity",
-        `Unstable pitch drift (±${driftRange.toFixed(0)} st) with reverb`
-      )
+        `Rotted room loop (${factor}x down, ${bits}-bit, ${(rotted[0].length / sr) | 0}s)`,
+      ),
     );
 
-    // 4. Dual-layer (up + down mixed) with distortion
-    const mixDown = T.resampleChannels(stereo, 1 / 2 ** (-18 / 12), stereo[0].length);
-    const mixUp = T.resampleChannels(stereo, 1 / 2 ** (18 / 12), stereo[0].length);
-    const dual = mixDown.map((ch, ci) => {
+    // 2. Cassette collapse — heavy tape degradation + flutter
+    let cassette = T.downsample(
+      stereo,
+      sr,
+      2 + Math.floor(lanes.degradation * 6),
+    );
+    cassette = applyTape(cassette, {
+      profile: "destroyed",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    cassette = dirtyMetallic(cassette, sr, {
+      decay: 0.2,
+      color: 0.4,
+      mix: 0.4,
+    });
+    cassette = finishSample(cassette, sr, {
+      profile: "degraded",
+      softClipDrive: 0.4,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__cassette_collapse.wav`,
+        cassette,
+        sr,
+        "oddity",
+        `Cassette collapse with heavy tape wear (${(cassette[0].length / sr) | 0}s)`,
+      ),
+    );
+
+    // 3. Speaker cone tear — saturated noise artifact + metallic reverb
+    let speaker = T.softClip(stereo, 0.5 + lanes.degradation * 0.5);
+    speaker = T.bandpass(
+      speaker,
+      sr,
+      200 + lanes.instability * 300,
+      2000 + lanes.degradation * 4000,
+    );
+    speaker = T.addNoise(speaker, 0.02 + lanes.degradation * 0.08);
+    speaker = T.dcBlock(speaker, sr);
+    speaker = dirtyMetallic(speaker, sr, {
+      decay: 0.3 + lanes.degradation * 0.3,
+      color: 0.5,
+      mix: 0.4,
+    });
+    speaker = finishSample(speaker, sr, {
+      profile: "degraded",
+      softClipDrive: 0.5,
+      limit: true,
+      fadeInMs: 5,
+      fadeOutMs: 30,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__speaker_cone_tear.wav`,
+        speaker,
+        sr,
+        "oddity",
+        `Speaker cone tear artifact (${(speaker[0].length / sr).toFixed(1)}s)`,
+      ),
+    );
+
+    // 4. Bitcrushed tail — aggressive crush + convolution smear
+    let tail = T.bitcrush(stereo, 2 + Math.floor(lanes.degradation * 5));
+    tail = T.downsample(tail, sr, 3 + Math.floor(lanes.degradation * 8));
+    tail = convolutionSmear(tail, sr, {
+      decayTimeS: 0.8 + lanes.space * 1.5,
+      mix: 0.5,
+      dampingHz: 4000,
+    });
+    tail = applyTape(tail, {
+      profile: "degraded",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    tail = finishSample(tail, sr, {
+      profile: "degraded",
+      softClipDrive: 0.2,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__bitcrushed_tail.wav`,
+        tail,
+        sr,
+        "oddity",
+        `Bitcrushed tail with convolution smear (${(tail[0].length / sr).toFixed(1)}s)`,
+      ),
+    );
+  }
+  return outputs.filter((s): s is GeneratedSample => s !== null);
+}
+
+// ── Pitch Wreckage ──────────────────────────────────────────────────
+
+function pitchWreckage(
+  files: AudioBufferData[],
+  chaos: number,
+  _onProgress?: (v: number, msg: string) => void,
+  _lengthMode?: LengthMode,
+): GeneratedSample[] {
+  const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.pitch_wreckage);
+
+  for (const src of files) {
+    const stem = src.name.replace(/\.[^.]+$/, "");
+    const sr = src.sampleRate;
+    const stereo = ensureStereo(src.channels);
+
+    // 1. Sub beast layer — octave down + sub-heavy tape + convolution
+    const sd = -12 - Math.floor(lanes.mutation * 12);
+    let beast = T.resampleChannels(
+      stereo,
+      1 / 2 ** (sd / 12),
+      stereo[0].length,
+    );
+    beast = applyTape(beast, {
+      profile: "sub_heavy",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    beast = convolutionSmear(beast, sr, {
+      decayTimeS: 0.5 + lanes.space,
+      mix: 0.3,
+    });
+    beast = finishSample(beast, sr, {
+      profile: "gentle",
+      softClipDrive: 0.3,
+      limit: true,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__sub_beast_layer.wav`,
+        beast,
+        sr,
+        "oddity",
+        `Sub beast layer (${sd} st) with sub-heavy processing`,
+      ),
+    );
+
+    // 2. Glass octave tail — octave up + bandpass + dark room
+    const su = 12 + Math.floor(lanes.mutation * 12);
+    let glass = T.resampleChannels(
+      stereo,
+      1 / 2 ** (su / 12),
+      stereo[0].length,
+    );
+    glass = T.bandpass(glass, sr, 500, 10000);
+    glass = darkRoom(glass, sr, {
+      decay: 0.3 + lanes.space * 0.4,
+      damping: 0.4,
+      mix: 0.5,
+    });
+    glass = finishSample(glass, sr, {
+      profile: "bright",
+      stereoWidth: lanes.stereo * 0.5,
+      fadeInMs: 20,
+      fadeOutMs: 100,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__glass_octave_tail.wav`,
+        glass,
+        sr,
+        "oddity",
+        `Glass octave tail (${su} st) with dark room`,
+      ),
+    );
+
+    // 3. Detuned metal pair — dual layer + metallic reverb
+    const detune1 = T.resampleChannels(
+      stereo,
+      1 / 2 ** (-18 / 12),
+      stereo[0].length,
+    );
+    const detune2 = T.resampleChannels(
+      stereo,
+      1 / 2 ** ((18 + lanes.instability * 6) / 12),
+      stereo[0].length,
+    );
+    const dual = detune1.map((ch, ci) => {
       const out = new Float32Array(ch.length);
-      for (let i = 0; i < ch.length; i++) out[i] = ch[i] * 0.5 + mixUp[ci][i] * 0.5;
+      for (let i = 0; i < ch.length; i++)
+        out[i] = ch[i] * 0.5 + detune2[ci][i] * 0.5;
       return out;
     });
-    let dualFinal = T.softClip(dual, 0.3 + chaos * 0.4);
-    dualFinal = T.delayEcho(dualFinal, sr, 120 + chaos * 100, 0.2, 0.3);
-    dualFinal = T.fadeIn(dualFinal, sr, 30);
-    dualFinal = T.normalizePeak(dualFinal, 0.95);
+    let metal = dirtyMetallic(dual, sr, {
+      decay: 0.3 + lanes.instability * 0.4,
+      color: 0.5 + lanes.instability * 0.4,
+      mix: 0.5,
+    });
+    metal = applyTape(metal, {
+      profile: "degraded",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.5,
+    });
+    metal = finishSample(metal, sr, {
+      profile: "gentle",
+      softClipDrive: 0.2,
+      stereoWidth: lanes.stereo * 0.5,
+    });
     outputs.push(
       makeSample(
-        `${stem}__dual_pitch.wav`,
-        dualFinal,
+        `${stem}__detuned_metal_pair.wav`,
+        metal,
         sr,
         "oddity",
-        `Dual-layer (±18 st mix) with distortion`
-      )
+        "Detuned stereo pitch pair with metallic reverb",
+      ),
+    );
+
+    // 4. Falling pitch smear — pitch drift + convolution
+    let fall = T.resampleChannels(
+      stereo,
+      1 / 2 ** ((-lanes.mutation * 8) / 12),
+      stereo[0].length,
+    );
+    fall = applyTape(fall, {
+      profile: "cinematic_dark",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    fall = convolutionSmear(fall, sr, {
+      decayTimeS: 1 + lanes.space * 2,
+      mix: 0.5,
+    });
+    fall = finishSample(fall, sr, {
+      profile: "warm",
+      fadeInMs: 30,
+      fadeOutMs: 200,
+      tailExtendS: lanes.tail * 0.5,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__falling_pitch_smear.wav`,
+        fall,
+        sr,
+        "oddity",
+        "Falling pitch smear with convolution wash",
+      ),
     );
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Loop Extractor (rewritten with heuristic candidate finder) ----------
+// ── Loop Extractor ──────────────────────────────────────────────────
 
-function loopExtractor(files: AudioBufferData[], chaos: number): GeneratedSample[] {
+function loopExtractor(
+  files: AudioBufferData[],
+  chaos: number,
+  _onProgress?: (v: number, msg: string) => void,
+  _lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.loop_extractor);
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     const stereo = ensureStereo(src.channels);
 
-    // Find the best loop candidates using energy analysis
     const candidates = T.findLoopCandidates(stereo, sr, {
       minDur: 1,
       maxDur: Math.min(8, stereo[0].length / sr / 2),
       maxCandidates: 3,
     });
-
     if (candidates.length === 0) continue;
 
-    // Pick the single best candidate
     const best = candidates[0];
-    const targetDur = 4 + Math.floor(chaos * 4); // 4-8 second loops
+    const targetDur = 4 + Math.floor(lanes.mutation * 4);
     const targetSamples = Math.floor(sr * targetDur);
 
     // 1. Clean loop
-    let cleanLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
-    cleanLoop = T.repeatToDuration(cleanLoop, Math.max(targetSamples, cleanLoop[0].length));
-    cleanLoop = T.fadeIn(cleanLoop, sr, 10);
-    cleanLoop = T.fadeOut(cleanLoop, sr, 20);
-    cleanLoop = T.haasEffect(cleanLoop, sr);
-    cleanLoop = T.finalWarm(cleanLoop, sr);
+    let clean = T.extractLoopWithCrossfade(
+      stereo,
+      best.start,
+      best.length,
+      sr,
+      20,
+    );
+    clean = T.repeatToDuration(clean, Math.max(targetSamples, clean[0].length));
+    clean = finishSample(clean, sr, {
+      profile: "gentle",
+      fadeInMs: 10,
+      fadeOutMs: 20,
+      stereoWidth: lanes.stereo * 0.2,
+    });
     outputs.push(
       makeSample(
         `${stem}__clean_loop.wav`,
-        cleanLoop,
+        clean,
         sr,
         "loop",
-        `${(cleanLoop[0].length / sr).toFixed(1)}s crossfaded clean loop`
-      )
+        `${(clean[0].length / sr).toFixed(1)}s crossfaded clean loop`,
+      ),
     );
 
-    // 2. Degraded loop — bitcrush + downsample + noise + wow
-    let degradedLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
-    degradedLoop = T.repeatToDuration(degradedLoop, targetSamples);
-    degradedLoop = T.normalizePeak(degradedLoop, 0.95);  // normalize before degradation to avoid silent output
-    degradedLoop = T.downsample(degradedLoop, sr, 2 + Math.floor(chaos * 6));
-    degradedLoop = T.bitcrush(degradedLoop, 4 + Math.floor(chaos * 6));
-    degradedLoop = T.addNoise(degradedLoop, 0.01 + chaos * 0.03);
-    degradedLoop = T.tapeWow(degradedLoop, sr, 0.003 + chaos * 0.006, 4);
-    degradedLoop = T.lowpass(degradedLoop, sr, 4000 - chaos * 2500);
-    degradedLoop = T.softClip(degradedLoop, 0.2 + chaos * 0.4);
-    degradedLoop = T.fadeIn(degradedLoop, sr, 10);
-    degradedLoop = T.fadeOut(degradedLoop, sr, 20);
-    degradedLoop = T.haasEffect(degradedLoop, sr);
-    degradedLoop = T.normalizePeak(degradedLoop, 0.95);
+    // 2. Dirty room loop — room reverb + tape
+    let dirty = T.extractLoopWithCrossfade(
+      stereo,
+      best.start,
+      best.length,
+      sr,
+      20,
+    );
+    dirty = T.repeatToDuration(dirty, targetSamples);
+    dirty = applyTape(dirty, {
+      profile: "subtle",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.3,
+    });
+    dirty = darkRoom(dirty, sr, {
+      decay: 0.2 + lanes.space * 0.3,
+      damping: 0.6,
+      mix: 0.35,
+    });
+    dirty = finishSample(dirty, sr, {
+      profile: "warm",
+      fadeInMs: 10,
+      fadeOutMs: 30,
+    });
     outputs.push(
       makeSample(
-        `${stem}__degraded_loop.wav`,
-        degradedLoop,
+        `${stem}__dirty_room_loop.wav`,
+        dirty,
         sr,
         "loop",
-        `${(degradedLoop[0].length / sr).toFixed(1)}s degraded loop with bitcrush and wow`
-      )
+        `${(dirty[0].length / sr).toFixed(1)}s dirty room loop`,
+      ),
     );
 
-    // 3. Ghost loop — reverb + lowpass + stereo widen
-    let ghostLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
-    ghostLoop = T.repeatToDuration(ghostLoop, targetSamples);
-    ghostLoop = T.normalizePeak(ghostLoop, 0.95);
-    ghostLoop = T.simpleReverb(ghostLoop, sr, 0.4 + chaos * 0.4, 2);
-    ghostLoop = T.lowpass(ghostLoop, sr, 1500 - chaos * 1000);
-    ghostLoop = T.stereoWiden(ghostLoop, 0.3 + chaos * 0.5);
-    ghostLoop = T.fadeIn(ghostLoop, sr, 50);
-    ghostLoop = T.fadeOut(ghostLoop, sr, 100);
-    ghostLoop = T.haasEffect(ghostLoop, sr);
-    ghostLoop = T.finalWarm(ghostLoop, sr);
+    // 3. Delayed loop — ping-pong delay
+    let delayedLp = T.extractLoopWithCrossfade(
+      stereo,
+      best.start,
+      best.length,
+      sr,
+      20,
+    );
+    delayedLp = T.repeatToDuration(delayedLp, targetSamples);
+    delayedLp = pingPongDelay(delayedLp, sr, {
+      timeMs: 60 + lanes.modulation * 150,
+      feedback: 0.2 + lanes.space * 0.4,
+      mix: 0.4,
+      feedbackFilterHz: 3000 - lanes.degradation * 2000,
+    });
+    delayedLp = finishSample(delayedLp, sr, {
+      profile: "gentle",
+      stereoWidth: lanes.stereo * 0.5,
+      fadeInMs: 10,
+      fadeOutMs: 30,
+    });
     outputs.push(
       makeSample(
-        `${stem}__ghost_loop.wav`,
-        ghostLoop,
+        `${stem}__delayed_loop.wav`,
+        delayedLp,
         sr,
         "loop",
-        `${(ghostLoop[0].length / sr).toFixed(1)}s ghost loop with reverb and stereo widen`
-      )
+        `${(delayedLp[0].length / sr).toFixed(1)}s delayed loop`,
+      ),
     );
 
-    // 4. Driven loop — saturation + delay + filter
-    let drivenLoop = T.extractLoopWithCrossfade(stereo, best.start, best.length, sr, 20);
-    drivenLoop = T.repeatToDuration(drivenLoop, targetSamples);
-    drivenLoop = T.normalizePeak(drivenLoop, 0.95);
-    drivenLoop = T.softClip(drivenLoop, 0.3 + chaos * 0.5);
-    drivenLoop = T.delayEcho(drivenLoop, sr, 60 + chaos * 100, 0.2 + chaos * 0.3, 0.35);
-    drivenLoop = T.bandpass(drivenLoop, sr, 80, 4000 + chaos * 4000);
-    drivenLoop = T.dcBlock(drivenLoop, sr);
-    drivenLoop = T.fadeIn(drivenLoop, sr, 10);
-    drivenLoop = T.fadeOut(drivenLoop, sr, 20);
-    drivenLoop = T.haasEffect(drivenLoop, sr);
-    drivenLoop = T.normalizePeak(drivenLoop, 0.95);
+    // 4. Ambient loop — heavy reverb + filter
+    let ambLp = T.extractLoopWithCrossfade(
+      stereo,
+      best.start,
+      best.length,
+      sr,
+      20,
+    );
+    ambLp = T.repeatToDuration(ambLp, targetSamples);
+    ambLp = modulatedHall(ambLp, sr, {
+      decay: 0.4 + lanes.space * 0.5,
+      modulationDepth: 0.002,
+      damping: 0.3,
+      mix: 0.5,
+    });
+    ambLp = applyTape(ambLp, {
+      profile: "warm",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.3,
+    });
+    ambLp = finishSample(ambLp, sr, {
+      profile: "warm",
+      stereoWidth: lanes.stereo * 0.6,
+      fadeInMs: 20,
+      fadeOutMs: 100,
+    });
     outputs.push(
       makeSample(
-        `${stem}__driven_loop.wav`,
-        drivenLoop,
+        `${stem}__ambient_loop.wav`,
+        ambLp,
         sr,
         "loop",
-        `${(drivenLoop[0].length / sr).toFixed(1)}s driven loop with saturation and delay`
-      )
+        `${(ambLp[0].length / sr).toFixed(1)}s ambient loop with hall reverb`,
+      ),
     );
+
+    // 5. One-shot from loop — extract + short tail
+    if (best.length > sr * 0.5) {
+      let oneshot = T.extractLoopWithCrossfade(
+        stereo,
+        best.start,
+        best.length,
+        sr,
+        10,
+      );
+      oneshot = applyTape(oneshot, {
+        profile: "subtle",
+        sampleRate: sr,
+        chaos: lanes.degradation * 0.2,
+      });
+      oneshot = convolutionSmear(oneshot, sr, { decayTimeS: 0.5, mix: 0.2 });
+      oneshot = finishSample(oneshot, sr, {
+        profile: "gentle",
+        fadeInMs: 5,
+        fadeOutMs: 50,
+        tailExtendS: lanes.tail * 0.3,
+      });
+      outputs.push(
+        makeSample(
+          `${stem}__one_shot_from_loop.wav`,
+          oneshot,
+          sr,
+          "one-shot",
+          `${(oneshot[0].length / sr).toFixed(1)}s one-shot extracted from loop`,
+        ),
+      );
+    }
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Impact / Riser Mutator ----------
+// ── Impact / Riser Mutator ───────────────────────────────────────────
 
-function impactRiserMutator(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
+function impactRiserMutator(
+  files: AudioBufferData[],
+  chaos: number,
+  onProgress?: (v: number, msg: string) => void,
+  _lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
+  const lanes = mapChaosToLanes(chaos, CHAOS_MAPS.impact_riser);
+
   for (const src of files) {
     const stem = src.name.replace(/\.[^.]+$/, "");
     const sr = src.sampleRate;
     const stereo = ensureStereo(src.channels);
 
-    // 1. Reversed riser — reverse + fade-in + saturation + reverb
-    onProgress?.(0.15, "Building riser…");
-    const riserDur = Math.min(4 + chaos * 8, Math.floor(stereo[0].length / sr));
+    // 1. Doom riser — reverse + filter sweep + hall + cinematic tape
+    onProgress?.(0.1, "Building doom riser…");
+    const riserDur = Math.min(4 + lanes.tail * 8, stereo[0].length / sr);
     const riserSamples = Math.floor(sr * riserDur);
-    let riser = T.reverse(stereo.map((ch) => ch.slice(0, riserSamples)));
-    riser = T.fadeIn(riser, sr, 500 + chaos * 1500);
-    riser = T.softClip(riser, chaos * 0.4);
-    riser = T.simpleReverb(riser, sr, 0.2 + chaos * 0.3, 1.5);
-    riser = T.filterSweep(riser, sr, 200, 3000 + chaos * 5000);
-    riser = T.haasEffect(riser, sr);
-    riser = T.finalWarm(riser, sr);
+    let doomRiser = T.reverse(stereo.map((ch) => ch.slice(0, riserSamples)));
+    doomRiser = T.filterSweep(doomRiser, sr, 80, 4000 + lanes.mutation * 6000);
+    doomRiser = applyTape(doomRiser, {
+      profile: "cinematic_dark",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.3,
+    });
+    doomRiser = modulatedHall(doomRiser, sr, {
+      decay: 0.3 + lanes.space * 0.5,
+      modulationDepth: 0.002,
+      damping: 0.3,
+      mix: 0.3,
+      size: 0.8,
+    });
+    doomRiser = finishSample(doomRiser, sr, {
+      profile: "warm",
+      stereoWidth: lanes.stereo * 0.6,
+      fadeInMs: 500 + lanes.tail * 1000,
+      fadeOutMs: 200,
+      tailExtendS: lanes.tail * 1.0,
+    });
     outputs.push(
       makeSample(
-        `${stem}__riser.wav`,
-        riser,
+        `${stem}__doom_riser.wav`,
+        doomRiser,
         sr,
         "ambience",
-        `${(riser[0].length / sr).toFixed(1)}s reversed riser with filter sweep`
-      )
+        `${(doomRiser[0].length / sr).toFixed(1)}s doom riser with cinematic tape`,
+      ),
     );
 
-    // 2. Pitch-dropped impact — resample + drive + highpass + reverb tail
-    onProgress?.(0.30, "Pitching impact…");
-    const si = -24 - Math.floor(chaos * 12);
-    let impact = T.resampleChannels(stereo, 1 / 2 ** (si / 12), stereo[0].length);
-    impact = T.softClip(impact, 0.3 + chaos * 0.5);
-    impact = T.highpass(impact, sr, 40);
-    impact = T.simpleReverb(impact, sr, 0.2 + chaos * 0.3, 1.5);
-    impact = T.fadeOut(impact, sr, 200);
-    impact = T.finalWarm(impact, sr);
+    // 2. Pressure drop — pitch-dropped impact + convolution
+    onProgress?.(0.25, "Pressure drop…");
+    const si = -24 - Math.floor(lanes.mutation * 12);
+    let pressure = T.resampleChannels(
+      stereo,
+      1 / 2 ** (si / 12),
+      stereo[0].length,
+    );
+    pressure = applyTape(pressure, {
+      profile: "sub_heavy",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    pressure = convolutionSmear(pressure, sr, {
+      decayTimeS: 0.5 + lanes.space,
+      mix: 0.4,
+    });
+    pressure = finishSample(pressure, sr, {
+      profile: "gentle",
+      softClipDrive: 0.3,
+      limit: true,
+      fadeInMs: 5,
+      fadeOutMs: 100,
+    });
     outputs.push(
       makeSample(
-        `${stem}__impact.wav`,
-        impact,
+        `${stem}__pressure_drop.wav`,
+        pressure,
         sr,
         "one-shot",
-        `Pitch-dropped impact (${si} st) with reverb tail`
-      )
+        `Pressure drop impact (${si} st) with convolution tail`,
+      ),
     );
 
-    // 3. Transient smear — reverb convolution wash
-    onProgress?.(0.45, "Smearing transients…");
-    const smearInput = T.capDuration(stereo, sr, 5);
-    const reverbTime = 0.5 + chaos * 2.5;
-    const irLen = Math.min(Math.floor(sr * reverbTime), smearInput[0].length);
-    const ir = new Float32Array(irLen);
-    for (let i = 0; i < irLen; i++) ir[i] = (Math.random() * 2 - 1) * Math.exp(-(i / irLen) * 5);
-    let irMax = 0;
-    for (let i = 0; i < irLen; i++) if (Math.abs(ir[i]) > irMax) irMax = Math.abs(ir[i]);
-    if (irMax > 1e-12) for (let i = 0; i < irLen; i++) ir[i] = (ir[i] / irMax) * 0.3;
-
-    const smearCh = smearInput.map((ch) => {
-      const conv = new Float32Array(ch.length);
-      const progressStep = Math.max(1, Math.floor(ch.length / 10));
-      for (let i = 0; i < ch.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < irLen && j <= i; j++) sum += ch[i - j] * ir[j];
-        conv[i] = sum;
-        if (i % progressStep === 0) onProgress?.(0.45 + (i / ch.length) * 0.20, "Convolving reverb…");
-      }
-      return conv;
+    // 3. Metal impact — reverse + metallic reverb + tape
+    onProgress?.(0.4, "Metal impact…");
+    const metalIn = T.capDuration(stereo, sr, 4);
+    let metalImpact = T.reverse(metalIn);
+    metalImpact = dirtyMetallic(metalImpact, sr, {
+      decay: 0.3 + lanes.degradation * 0.4,
+      color: 0.4 + lanes.instability * 0.5,
+      mix: 0.5,
     });
-    const wet = 0.3 + chaos * 0.5;
-    const smeared = smearInput.map((ch, ci) => {
-      const out = new Float32Array(ch.length);
-      for (let i = 0; i < ch.length; i++) out[i] = ch[i] * (1 - wet) + smearCh[ci][i] * wet;
-      return out;
+    metalImpact = applyTape(metalImpact, {
+      profile: "degraded",
+      sampleRate: sr,
+      chaos: lanes.degradation * 0.5,
     });
-    let smear = T.finalWarm(smeared, sr);
-    smear = T.fadeOut(smear, sr, 100);
+    metalImpact = finishSample(metalImpact, sr, {
+      profile: "gentle",
+      softClipDrive: 0.4,
+      fadeInMs: 10,
+      fadeOutMs: 80,
+    });
     outputs.push(
       makeSample(
-        `${stem}__smear.wav`,
-        smear,
+        `${stem}__metal_impact.wav`,
+        metalImpact,
         sr,
         "one-shot",
-        `${(smear[0].length / sr).toFixed(1)}s transient smear (${reverbTime.toFixed(1)}s reverb)`
-      )
+        `Metal impact with metallic reverb (${(metalImpact[0].length / sr).toFixed(1)}s)`,
+      ),
     );
 
-    // 4. Filter sweep riser + impact — longer build with distortion
-    onProgress?.(0.70, "Sweeping filter riser…");
-    const riseLen = Math.min(Math.floor(sr * (3 + chaos * 6)), stereo[0].length);
-    let sweepRiser = T.reverse(stereo.map((ch) => ch.slice(0, riseLen)));
-    sweepRiser = T.filterSweep(sweepRiser, sr, 50, 4000 + chaos * 8000);
-    sweepRiser = T.softClip(sweepRiser, 0.2 + chaos * 0.5);
-    sweepRiser = T.delayEcho(sweepRiser, sr, 50 + chaos * 80, 0.2, 0.3);
-    sweepRiser = T.fadeIn(sweepRiser, sr, 1000 + chaos * 2000);
-    sweepRiser = T.lowpass(sweepRiser, sr, 6000 - chaos * 3000);
-    sweepRiser = T.haasEffect(sweepRiser, sr);
-    sweepRiser = T.finalWarm(sweepRiser, sr);
+    // 4. Reverse slam — heavy transient + reverse bloom
+    onProgress?.(0.55, "Reverse slam…");
+    let slam = T.capDuration(stereo, sr, 3);
+    slam = T.softClip(slam, 0.3 + lanes.degradation * 0.5);
+    slam = reverseBloom(slam, sr, {
+      decay: 0.4 + lanes.space * 0.5,
+      damping: 0.4,
+      mix: 0.6,
+    });
+    slam = finishSample(slam, sr, {
+      profile: "gentle",
+      softClipDrive: 0.3,
+      limit: true,
+      stereoWidth: lanes.stereo * 0.3,
+    });
     outputs.push(
       makeSample(
-        `${stem}__filter_riser.wav`,
-        sweepRiser,
+        `${stem}__reverse_slam.wav`,
+        slam,
         sr,
-        "ambience",
-        `${(sweepRiser[0].length / sr).toFixed(1)}s filter sweep riser with echo`
-      )
+        "one-shot",
+        `Reverse slam with bloom reverb`,
+      ),
+    );
+
+    // 5. Sub collapse — low-end only impact with deep tape
+    onProgress?.(0.7, "Sub collapse…");
+    let subCollapse = T.resampleChannels(
+      stereo,
+      1 / 2 ** (-30 / 12),
+      stereo[0].length,
+    );
+    subCollapse = applyTape(subCollapse, {
+      profile: "sub_heavy",
+      sampleRate: sr,
+      chaos: lanes.degradation,
+    });
+    subCollapse = convolutionSmear(subCollapse, sr, {
+      decayTimeS: 1 + lanes.space * 2,
+      mix: 0.5,
+      dampingHz: 3000,
+    });
+    subCollapse = finishSample(subCollapse, sr, {
+      profile: "warm",
+      softClipDrive: 0.4,
+      limit: true,
+      fadeInMs: 5,
+      fadeOutMs: 200,
+      tailExtendS: lanes.tail * 1.0,
+    });
+    outputs.push(
+      makeSample(
+        `${stem}__sub_collapse.wav`,
+        subCollapse,
+        sr,
+        "one-shot",
+        `Sub collapse (-30 st) with deep convolution tail`,
+      ),
     );
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-// ---------- Chaos Pack ----------
+// ── Chaos Pack ───────────────────────────────────────────────────────
 
-function chaosPack(files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void): GeneratedSample[] {
+function chaosPack(
+  files: AudioBufferData[],
+  chaos: number,
+  onProgress?: (v: number, msg: string) => void,
+  lengthMode?: LengthMode,
+): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
   for (const src of files) {
-    const stem = src.name.replace(/\.[^.]+$/, "");
-    const rng = seededRng(hashCode(stem) + 9999 + Math.floor(chaos * 1000));
-
-    // Curated chaos levels per sub-recipe
-    const cAmbient = Math.min(1, chaos * 0.6 + rng.next() * 0.3);
-    const cGhost = Math.min(1, chaos * 0.7 + rng.next() * 0.3);
-    const cGranular = Math.min(1, chaos * 0.8 + rng.next() * 0.2);
-    const cDegrade = Math.min(1, chaos * 0.7 + rng.next() * 0.3);
-    const cLoop = Math.min(1, chaos * 0.6 + rng.next() * 0.4);
-    const cPitch = Math.min(1, chaos * 0.8 + rng.next() * 0.2);
-    const cRiser = Math.min(1, chaos * 0.7 + rng.next() * 0.3);
-
-    // 1. Ambience (from ambient_stretch, pick ghost pad variant)
+    // 1. Ambience — cathedral bed variant
     onProgress?.(0.08, "Generating ambience…");
-    const ambResults = ambientStretchLab([src], cAmbient);
-    const padSample = ambResults.find((s) => s?.filename?.includes("ghost_pad"));
-    if (padSample) outputs.push(padSample);
+    const ambResults = ambientStretchLab([src], chaos * 0.7, undefined, lengthMode);
+    const bedSample = ambResults.find((s) =>
+      s?.filename?.includes("cathedral_bed"),
+    );
+    if (bedSample) outputs.push(bedSample);
 
     // 2. Ghost reverse oddity
     onProgress?.(0.18, "Generating ghost reverse…");
-    const ghostResults = ghostReverseLab([src], cGhost);
-    const ghostSample = ghostResults.find((s) => s?.filename?.includes("ghost_hit"));
-    if (ghostSample) outputs.push(ghostSample);
+    const ghostResults = ghostReverseLab([src], chaos * 0.8, undefined, lengthMode);
+    const haunted = ghostResults.find((s) =>
+      s?.filename?.includes("haunted_room"),
+    );
+    if (haunted) outputs.push(haunted);
 
-    // 3-4. Two granular shards (different types)
-    onProgress?.(0.28, "Scattering granular shards…");
-    const granResults = granularShards([src], cGranular);
-    const microChop = granResults.find((s) => s?.filename?.includes("micro_chop"));
-    const pitchCloud = granResults.find((s) => s?.filename?.includes("pitch_cloud"));
-    if (microChop) outputs.push(microChop);
-    if (pitchCloud) outputs.push(pitchCloud);
+    // 3-4. Granular cloud + shards
+    onProgress?.(0.28, "Scattering granular…");
+    const granResults = granularShards([src], chaos, undefined, lengthMode);
+    const particle = granResults.find((s) =>
+      s?.filename?.includes("particle_cloud"),
+    );
+    const swarm = granResults.find((s) =>
+      s?.filename?.includes("granular_delay_swarm"),
+    );
+    if (particle) outputs.push(particle);
+    if (swarm) outputs.push(swarm);
 
     // 5. Degraded loop
-    onProgress?.(0.40, "Finding loop candidates…");
-    const loopResults = loopExtractor([src], cDegrade);
-    const degradedLoop = loopResults.find((s) => s?.filename?.includes("degraded_loop"));
-    if (degradedLoop) outputs.push(degradedLoop);
+    onProgress?.(0.4, "Finding loops…");
+    const loopResults = loopExtractor([src], chaos * 0.8, undefined, lengthMode);
+    const dirtyLoop = loopResults.find((s) =>
+      s?.filename?.includes("dirty_room"),
+    );
+    if (dirtyLoop) outputs.push(dirtyLoop);
 
     // 6. Impact/riser
-    onProgress?.(0.50, "Building risers and impacts…");
-    const riserResults = impactRiserMutator([src], cRiser);
-    const riser = riserResults.find((s) => s?.filename?.includes("riser"));
-    if (riser) outputs.push(riser);
+    onProgress?.(0.5, "Building risers…");
+    const riserResults = impactRiserMutator([src], chaos * 0.8, undefined, lengthMode);
+    const doomRiser = riserResults.find((s) =>
+      s?.filename?.includes("doom_riser"),
+    );
+    if (doomRiser) outputs.push(doomRiser);
 
-    // 7. Pitch-wrecked oddity
+    // 7. Pitch wreckage oddity
     onProgress?.(0.55, "Wrecking pitch…");
-    const pitchResults = pitchWreckage([src], cPitch);
-    const oddity = pitchResults.find((s) => s?.filename?.includes("octave_down"));
-    if (oddity) outputs.push(oddity);
+    const pitchResults = pitchWreckage([src], chaos * 0.9, undefined, lengthMode);
+    const subBeast = pitchResults.find((s) =>
+      s?.filename?.includes("sub_beast"),
+    );
+    if (subBeast) outputs.push(subBeast);
   }
   return outputs.filter((s): s is GeneratedSample => s !== null);
 }
 
-function hashCode(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  return h;
-}
+// ── Registry ─────────────────────────────────────────────────────────
 
-// ---------- Registry ----------
+type PresetFn = (
+  files: AudioBufferData[],
+  chaos: number,
+  onProgress?: (v: number, msg: string) => void,
+  lengthMode?: LengthMode,
+) => GeneratedSample[];
 
-type PresetFn = (files: AudioBufferData[], chaos: number, onProgress?: (v: number, msg: string) => void) => GeneratedSample[];
-
-const RECIPE_REGISTRY: Record<string, { fn: PresetFn; outputCount: number; categories: SampleCategory[] }> = {
+const RECIPE_REGISTRY: Record<
+  string,
+  { fn: PresetFn; outputCount: number; categories: SampleCategory[] }
+> = {
   ambient_stretch: {
     fn: ambientStretchLab,
     outputCount: 5,
@@ -968,7 +1618,7 @@ const RECIPE_REGISTRY: Record<string, { fn: PresetFn; outputCount: number; categ
   ghost_reverse: {
     fn: ghostReverseLab,
     outputCount: 4,
-    categories: ["ambience", "oddity", "oddity", "one-shot"],
+    categories: ["ambience", "ambience", "oddity", "ambience"],
   },
   granular_shards: {
     fn: granularShards,
@@ -989,7 +1639,7 @@ const RECIPE_REGISTRY: Record<string, { fn: PresetFn; outputCount: number; categ
   bitrot_dirt: {
     fn: bitrotDirt,
     outputCount: 4,
-    categories: ["oddity", "oddity", "loop", "oddity"],
+    categories: ["oddity", "oddity", "oddity", "oddity"],
   },
   pitch_wreckage: {
     fn: pitchWreckage,
@@ -998,18 +1648,26 @@ const RECIPE_REGISTRY: Record<string, { fn: PresetFn; outputCount: number; categ
   },
   loop_extractor: {
     fn: loopExtractor,
-    outputCount: 4,
-    categories: ["loop", "loop", "loop", "loop"],
+    outputCount: 5,
+    categories: ["loop", "loop", "loop", "loop", "one-shot"],
   },
   impact_riser: {
     fn: impactRiserMutator,
-    outputCount: 4,
-    categories: ["ambience", "one-shot", "one-shot", "ambience"],
+    outputCount: 5,
+    categories: ["ambience", "one-shot", "one-shot", "one-shot", "one-shot"],
   },
   chaos_pack: {
     fn: chaosPack,
     outputCount: 7,
-    categories: ["ambience", "oddity", "granular", "granular", "loop", "ambience", "oddity"],
+    categories: [
+      "ambience",
+      "oddity",
+      "granular",
+      "granular",
+      "loop",
+      "ambience",
+      "oddity",
+    ],
   },
 };
 
@@ -1017,13 +1675,15 @@ export function generatePack(
   files: AudioBufferData[],
   preset: string,
   chaos: number,
-  onProgress: (value: number, message: string) => void
+  onProgress: (value: number, message: string) => void,
+  lengthMode?: string,
 ): { samples: GeneratedSample[]; manifestSamples: PackManifestSample[] } {
   const recipe = RECIPE_REGISTRY[preset];
   if (!recipe) throw new Error(`Unknown preset: ${preset}`);
 
   onProgress(0.05, "Processing audio…");
-  const samples = recipe.fn(files, chaos, onProgress);
+  const lm = lengthMode as LengthMode | undefined;
+  const samples = recipe.fn(files, chaos, onProgress, lm);
 
   const manifestSamples: PackManifestSample[] = samples.map((s) => ({
     filename: s.filename,

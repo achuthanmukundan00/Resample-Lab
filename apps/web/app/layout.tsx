@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Resample-Lab — Audio Mutation Lab",
-  description: "Turn any sound into a sample pack. Local-first audio mutation lab using non-AI DSP.",
+  description:
+    "Turn any sound into a sample pack. Local-first audio mutation lab using non-AI DSP.",
 };
 
 export default function RootLayout({

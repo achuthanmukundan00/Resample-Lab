@@ -1,25 +1,25 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import { PackStatusResponse } from '@/lib/types'
-import { PackManifest } from '@/lib/dsp/types'
-import { api } from '@/lib/api'
-import { MICRO_MESSAGES } from '@/lib/microcopy'
+import { useEffect, useRef, useState } from "react";
+import { PackStatusResponse } from "@/lib/types";
+import { PackManifest } from "@/lib/dsp/types";
+import { api } from "@/lib/api";
+import { MICRO_MESSAGES } from "@/lib/microcopy";
 
-const POLL_TIMEOUT_MS = 60_000
+const POLL_TIMEOUT_MS = 60_000;
 
 interface PackStatusCardProps {
   /** API polling mode (legacy backend path) */
-  packId?: string
-  onComplete?: (status: PackStatusResponse) => void
+  packId?: string;
+  onComplete?: (status: PackStatusResponse) => void;
 
   /** Local processing mode */
-  localStatus?: 'idle' | 'processing' | 'complete' | 'error'
-  localProgress?: number
-  localMessage?: string
-  manifest?: PackManifest | null
-  onLocalDownload?: () => void
-  onReset?: () => void
+  localStatus?: "idle" | "processing" | "complete" | "error";
+  localProgress?: number;
+  localMessage?: string;
+  manifest?: PackManifest | null;
+  onLocalDownload?: () => void;
+  onReset?: () => void;
 }
 
 export default function PackStatusCard({
@@ -32,64 +32,64 @@ export default function PackStatusCard({
   onLocalDownload,
   onReset,
 }: PackStatusCardProps) {
-  const [status, setStatus] = useState<PackStatusResponse | null>(null)
-  const [microIndex, setMicroIndex] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const startTime = useRef(Date.now())
+  const [status, setStatus] = useState<PackStatusResponse | null>(null);
+  const [microIndex, setMicroIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const startTime = useRef(Date.now());
 
   // ---- API polling mode ----
   useEffect(() => {
-    if (!packId) return
+    if (!packId) return;
 
-    let cancelled = false
-    startTime.current = Date.now()
+    let cancelled = false;
+    startTime.current = Date.now();
 
     const poll = async () => {
-      if (cancelled) return
+      if (cancelled) return;
       if (Date.now() - startTime.current > POLL_TIMEOUT_MS) {
         setError(
           `Pack generation timed out after ${POLL_TIMEOUT_MS / 1000}s. The backend may be busy or unavailable.`,
-        )
-        return
+        );
+        return;
       }
 
       try {
-        const s = await api.getPackStatus(packId)
-        if (cancelled) return
-        setStatus(s)
+        const s = await api.getPackStatus(packId);
+        if (cancelled) return;
+        setStatus(s);
 
-        if (s.status === 'completed' || s.status === 'failed') {
-          onComplete?.(s)
-          return
+        if (s.status === "completed" || s.status === "failed") {
+          onComplete?.(s);
+          return;
         }
-        setTimeout(poll, 1500)
+        setTimeout(poll, 1500);
       } catch (e) {
-        if (cancelled) return
-        setError(e instanceof Error ? e.message : 'Failed to fetch status')
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to fetch status");
       }
-    }
+    };
 
-    poll()
+    poll();
     return () => {
-      cancelled = true
-    }
-  }, [packId, onComplete])
+      cancelled = true;
+    };
+  }, [packId, onComplete]);
 
   // Micro-message rotation (for both modes)
   const isActive = packId
-    ? status?.status === 'processing'
-    : localStatus === 'processing'
+    ? status?.status === "processing"
+    : localStatus === "processing";
 
   useEffect(() => {
-    if (!isActive) return
+    if (!isActive) return;
     const t = setInterval(() => {
-      setMicroIndex((i) => (i + 1) % MICRO_MESSAGES.length)
-    }, 3000)
-    return () => clearInterval(t)
-  }, [isActive])
+      setMicroIndex((i) => (i + 1) % MICRO_MESSAGES.length);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [isActive]);
 
   // ---- Error display ----
-  const displayError = error || (localStatus === 'error' ? localMessage : null)
+  const displayError = error || (localStatus === "error" ? localMessage : null);
 
   if (displayError) {
     return (
@@ -107,20 +107,20 @@ export default function PackStatusCard({
           </button>
         )}
       </div>
-    )
+    );
   }
 
   // ---- Local mode ----
   if (localStatus) {
-    if (localStatus === 'idle') return null
+    if (localStatus === "idle") return null;
 
-    const progress = Math.min(1, Math.max(0, localProgress))
+    const progress = Math.min(1, Math.max(0, localProgress));
 
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-            {localStatus === 'complete' ? 'completed' : 'processing'}
+            {localStatus === "complete" ? "completed" : "processing"}
           </span>
           <span className="text-xs font-mono text-accent">
             {Math.round(progress * 100)}%
@@ -134,13 +134,13 @@ export default function PackStatusCard({
           />
         </div>
 
-        {localStatus === 'processing' && (
+        {localStatus === "processing" && (
           <p className="text-xs text-zinc-500 italic">
             {localMessage || MICRO_MESSAGES[microIndex]}
           </p>
         )}
 
-        {localStatus === 'complete' && (
+        {localStatus === "complete" && (
           <div className="space-y-2">
             <button
               onClick={onLocalDownload}
@@ -161,7 +161,7 @@ export default function PackStatusCard({
           </div>
         )}
       </div>
-    )
+    );
   }
 
   // ---- API polling mode (legacy) ----
@@ -171,17 +171,17 @@ export default function PackStatusCard({
         <div className="h-4 w-24 bg-zinc-800 rounded mb-3" />
         <div className="h-2 bg-zinc-800 rounded-full" />
       </div>
-    )
+    );
   }
 
   const handleDownload = async () => {
-    if (!packId) return
+    if (!packId) return;
     try {
-      await api.downloadPack(packId)
+      await api.downloadPack(packId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Download failed')
+      setError(e instanceof Error ? e.message : "Download failed");
     }
-  }
+  };
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
@@ -201,13 +201,13 @@ export default function PackStatusCard({
         />
       </div>
 
-      {status.status === 'processing' && (
+      {status.status === "processing" && (
         <p className="text-xs text-zinc-500 italic">
           {MICRO_MESSAGES[microIndex]}
         </p>
       )}
 
-      {status.status === 'completed' && (
+      {status.status === "completed" && (
         <div className="space-y-2">
           <button
             onClick={handleDownload}
@@ -228,11 +228,11 @@ export default function PackStatusCard({
         </div>
       )}
 
-      {status.status === 'failed' && (
+      {status.status === "failed" && (
         <p className="text-xs text-red-400">
-          {status.error || 'Generation failed'}
+          {status.error || "Generation failed"}
         </p>
       )}
     </div>
-  )
+  );
 }

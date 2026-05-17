@@ -24,7 +24,8 @@ abstract class BiquadFilter {
     const { b0, b1, b2, a1, a2 } = this;
     for (let i = 0; i < input.length; i++) {
       const x = input[i];
-      const y = b0 * x + b1 * this.x1 + b2 * this.x2 - a1 * this.y1 - a2 * this.y2;
+      const y =
+        b0 * x + b1 * this.x1 + b2 * this.x2 - a1 * this.y1 - a2 * this.y2;
       this.x2 = this.x1;
       this.x1 = x;
       this.y2 = this.y1;
@@ -49,9 +50,9 @@ class LowpassFilter extends BiquadFilter {
     const sinw0 = Math.sin(w0);
     const alpha = sinw0 / (2 * 0.7071);
     const a0 = 1 + alpha;
-    this.b0 = ((1 - cosw0) / 2) / a0;
+    this.b0 = (1 - cosw0) / 2 / a0;
     this.b1 = (1 - cosw0) / a0;
-    this.b2 = ((1 - cosw0) / 2) / a0;
+    this.b2 = (1 - cosw0) / 2 / a0;
     this.a1 = (-2 * cosw0) / a0;
     this.a2 = (1 - alpha) / a0;
   }
@@ -71,9 +72,9 @@ class HighpassFilter extends BiquadFilter {
     const sinw0 = Math.sin(w0);
     const alpha = sinw0 / (2 * 0.7071);
     const a0 = 1 + alpha;
-    this.b0 = ((1 + cosw0) / 2) / a0;
-    this.b1 = (-(1 + cosw0)) / a0;
-    this.b2 = ((1 + cosw0) / 2) / a0;
+    this.b0 = (1 + cosw0) / 2 / a0;
+    this.b1 = -(1 + cosw0) / a0;
+    this.b2 = (1 + cosw0) / 2 / a0;
     this.a1 = (-2 * cosw0) / a0;
     this.a2 = (1 - alpha) / a0;
   }
@@ -96,9 +97,9 @@ class BandpassFilter extends BiquadFilter {
     const Q = Math.sqrt(2) / (Math.pow(2, bw) - 1 / Math.pow(2, bw));
     const alpha = sinw0 / (2 * Q);
     const a0 = 1 + alpha;
-    this.b0 = (sinw0 / 2) / a0;
+    this.b0 = sinw0 / 2 / a0;
     this.b1 = 0 / a0;
-    this.b2 = (-sinw0 / 2) / a0;
+    this.b2 = -sinw0 / 2 / a0;
     this.a1 = (-2 * cosw0) / a0;
     this.a2 = (1 - alpha) / a0;
   }
@@ -106,7 +107,10 @@ class BandpassFilter extends BiquadFilter {
 
 // ---------- Per-channel filter helpers ----------
 
-function applyFilter(channels: Float32Array[], filterFactory: () => BiquadFilter): Float32Array[] {
+function applyFilter(
+  channels: Float32Array[],
+  filterFactory: () => BiquadFilter,
+): Float32Array[] {
   return channels.map((ch) => filterFactory().process(ch));
 }
 
@@ -120,11 +124,19 @@ export function reverse(channels: Float32Array[]): Float32Array[] {
   });
 }
 
-export function lowpass(channels: Float32Array[], sr: number, cutoff: number): Float32Array[] {
+export function lowpass(
+  channels: Float32Array[],
+  sr: number,
+  cutoff: number,
+): Float32Array[] {
   return applyFilter(channels, () => new LowpassFilter(sr, cutoff));
 }
 
-export function highpass(channels: Float32Array[], sr: number, cutoff: number): Float32Array[] {
+export function highpass(
+  channels: Float32Array[],
+  sr: number,
+  cutoff: number,
+): Float32Array[] {
   return applyFilter(channels, () => new HighpassFilter(sr, cutoff));
 }
 
@@ -132,12 +144,18 @@ export function bandpass(
   channels: Float32Array[],
   sr: number,
   low: number,
-  high: number
+  high: number,
 ): Float32Array[] {
-  return applyFilter(channels, () => new BandpassFilter(sr, Math.max(20, low), Math.min(sr / 2 - 1, high)));
+  return applyFilter(
+    channels,
+    () => new BandpassFilter(sr, Math.max(20, low), Math.min(sr / 2 - 1, high)),
+  );
 }
 
-export function softClip(channels: Float32Array[], drive: number): Float32Array[] {
+export function softClip(
+  channels: Float32Array[],
+  drive: number,
+): Float32Array[] {
   if (drive <= 0) return channels.map((ch) => ch.slice());
   const gain = 1 + drive * 9;
   return channels.map((ch) => {
@@ -150,23 +168,31 @@ export function softClip(channels: Float32Array[], drive: number): Float32Array[
   });
 }
 
-export function bitcrush(channels: Float32Array[], bits: number): Float32Array[] {
+export function bitcrush(
+  channels: Float32Array[],
+  bits: number,
+): Float32Array[] {
   const b = Math.max(1, Math.min(16, Math.round(bits)));
   if (b >= 16) return channels.map((ch) => ch.slice());
   const levels = 1 << (b - 1);
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++) out[i] = Math.round(ch[i] * levels) / levels;
+    for (let i = 0; i < ch.length; i++)
+      out[i] = Math.round(ch[i] * levels) / levels;
     return out;
   });
 }
 
-export function addNoise(channels: Float32Array[], amount: number): Float32Array[] {
+export function addNoise(
+  channels: Float32Array[],
+  amount: number,
+): Float32Array[] {
   return channels.map((ch) => {
     const peak = maxAbs(ch);
     const noiseScale = peak > 1e-12 ? peak * amount : 0;
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++) out[i] = ch[i] + (Math.random() * 2 - 1) * noiseScale;
+    for (let i = 0; i < ch.length; i++)
+      out[i] = ch[i] + (Math.random() * 2 - 1) * noiseScale;
     return out;
   });
 }
@@ -180,7 +206,10 @@ function maxAbs(ch: Float32Array): number {
   return m;
 }
 
-export function normalizePeak(channels: Float32Array[], peak: number = 0.95): Float32Array[] {
+export function normalizePeak(
+  channels: Float32Array[],
+  peak: number = 0.95,
+): Float32Array[] {
   let maxAll = 0;
   for (const ch of channels) {
     const m = maxAbs(ch);
@@ -195,7 +224,11 @@ export function normalizePeak(channels: Float32Array[], peak: number = 0.95): Fl
   });
 }
 
-export function fadeIn(channels: Float32Array[], sr: number, ms: number): Float32Array[] {
+export function fadeIn(
+  channels: Float32Array[],
+  sr: number,
+  ms: number,
+): Float32Array[] {
   const samples = Math.min(Math.floor((sr * ms) / 1000), channels[0].length);
   if (samples <= 0) return channels.map((ch) => ch.slice());
   return channels.map((ch) => {
@@ -205,7 +238,11 @@ export function fadeIn(channels: Float32Array[], sr: number, ms: number): Float3
   });
 }
 
-export function fadeOut(channels: Float32Array[], sr: number, ms: number): Float32Array[] {
+export function fadeOut(
+  channels: Float32Array[],
+  sr: number,
+  ms: number,
+): Float32Array[] {
   const len = channels[0].length;
   const samples = Math.min(Math.floor((sr * ms) / 1000), len);
   if (samples <= 0) return channels.map((ch) => ch.slice());
@@ -216,7 +253,11 @@ export function fadeOut(channels: Float32Array[], sr: number, ms: number): Float
   });
 }
 
-export function applyFades(channels: Float32Array[], sr: number, ms: number): Float32Array[] {
+export function applyFades(
+  channels: Float32Array[],
+  sr: number,
+  ms: number,
+): Float32Array[] {
   return fadeOut(fadeIn(channels, sr, ms), sr, ms);
 }
 
@@ -227,7 +268,7 @@ export function delayEcho(
   sr: number,
   delayMs: number,
   feedback: number,
-  mix: number
+  mix: number,
 ): Float32Array[] {
   const delaySamples = Math.floor((sr * delayMs) / 1000);
   if (delaySamples <= 0 || delaySamples >= channels[0].length)
@@ -239,14 +280,20 @@ export function delayEcho(
       wet[i] = ch[i - delaySamples] + feedback * wet[i - delaySamples];
     }
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++) out[i] = ch[i] * (1 - mix) + wet[i] * mix;
+    for (let i = 0; i < ch.length; i++)
+      out[i] = ch[i] * (1 - mix) + wet[i] * mix;
     return normalizePeak([out], 0.95)[0];
   });
 }
 
 // ---------- Simple reverb ----------
 
-export function simpleReverb(channels: Float32Array[], sr: number, decay: number, tailS: number): Float32Array[] {
+export function simpleReverb(
+  channels: Float32Array[],
+  sr: number,
+  decay: number,
+  tailS: number,
+): Float32Array[] {
   const delayMs = [31, 37, 43, 53];
   const feedback = decay * 0.7;
   const maxLen = Math.min(channels[0].length, Math.floor(sr * tailS * 4));
@@ -276,7 +323,12 @@ export function simpleReverb(channels: Float32Array[], sr: number, decay: number
 
 // ---------- Tape wow ----------
 
-export function tapeWow(channels: Float32Array[], sr: number, depth: number, rate: number): Float32Array[] {
+export function tapeWow(
+  channels: Float32Array[],
+  sr: number,
+  depth: number,
+  rate: number,
+): Float32Array[] {
   if (depth <= 0) return channels.map((ch) => ch.slice());
 
   const n = channels[0].length;
@@ -300,7 +352,11 @@ export function tapeWow(channels: Float32Array[], sr: number, depth: number, rat
 
 // ---------- Downsample ----------
 
-export function downsample(channels: Float32Array[], sr: number, factor: number): Float32Array[] {
+export function downsample(
+  channels: Float32Array[],
+  sr: number,
+  factor: number,
+): Float32Array[] {
   const f = Math.max(2, Math.round(factor));
   const lpCutoff = sr / (2 * f);
   let filtered = bandpass(channels, sr, 20, lpCutoff);
@@ -337,7 +393,7 @@ export function resample(channel: Float32Array, ratio: number): Float32Array {
 export function resampleChannels(
   channels: Float32Array[],
   ratio: number,
-  targetLen?: number
+  targetLen?: number,
 ): Float32Array[] {
   return channels.map((ch) => {
     const r = resample(ch, ratio);
@@ -353,7 +409,10 @@ export function resampleChannels(
 
 // ---------- Pitch shift grain (resample + trim/pad) ----------
 
-export function pitchShiftGrain(channel: Float32Array, semitones: number): Float32Array {
+export function pitchShiftGrain(
+  channel: Float32Array,
+  semitones: number,
+): Float32Array {
   const ratio = 2 ** (semitones / 12);
   const shifted = resample(channel, ratio);
   if (shifted.length < channel.length) {
@@ -364,13 +423,20 @@ export function pitchShiftGrain(channel: Float32Array, semitones: number): Float
   return shifted.slice(0, channel.length);
 }
 
-export function pitchShiftGrainChannels(channels: Float32Array[], semitones: number): Float32Array[] {
+export function pitchShiftGrainChannels(
+  channels: Float32Array[],
+  semitones: number,
+): Float32Array[] {
   return channels.map((ch) => pitchShiftGrain(ch, semitones));
 }
 
 // ---------- Slice audio into grains ----------
 
-export function sliceAudio(channels: Float32Array[], sr: number, grainMs: number): Float32Array[][] {
+export function sliceAudio(
+  channels: Float32Array[],
+  sr: number,
+  grainMs: number,
+): Float32Array[][] {
   const grainSamples = Math.floor((sr * grainMs) / 1000);
   if (grainSamples <= 0) return [channels.map((ch) => ch.slice())];
 
@@ -387,7 +453,7 @@ export function sliceAudio(channels: Float32Array[], sr: number, grainMs: number
 export function wsolaStretch(
   channels: Float32Array[],
   sr: number,
-  ratio: number
+  ratio: number,
 ): Float32Array[] {
   // Fall back to resample for extreme ratios or mono
   const n = channels[0].length;
@@ -450,7 +516,7 @@ export function interleave(channels: Float32Array[]): Float32Array {
 export function capDuration(
   channels: Float32Array[],
   sr: number,
-  maxS: number
+  maxS: number,
 ): Float32Array[] {
   const maxSamples = Math.floor(sr * maxS);
   if (channels[0].length <= maxSamples) return channels;
@@ -459,7 +525,11 @@ export function capDuration(
 
 // ---------- Crossfade / loop ----------
 
-export function crossfadeLoop(channels: Float32Array[], sr: number, crossfadeMs: number): Float32Array[] {
+export function crossfadeLoop(
+  channels: Float32Array[],
+  sr: number,
+  crossfadeMs: number,
+): Float32Array[] {
   const len = channels[0].length;
   const fadeLen = Math.min(Math.floor((sr * crossfadeMs) / 1000), len / 2);
   if (fadeLen <= 0) return channels.map((ch) => ch.slice());
@@ -477,7 +547,11 @@ export function crossfadeLoop(channels: Float32Array[], sr: number, crossfadeMs:
 
 // ---------- DC Blocking Filter ----------
 
-export function dcBlock(channels: Float32Array[], sr: number = 48000, cutoff: number = 30): Float32Array[] {
+export function dcBlock(
+  channels: Float32Array[],
+  sr: number = 48000,
+  cutoff: number = 30,
+): Float32Array[] {
   const R = 1 - (2 * Math.PI * cutoff) / sr;
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
@@ -494,7 +568,10 @@ export function dcBlock(channels: Float32Array[], sr: number = 48000, cutoff: nu
 
 // ---------- Stereo Widen (mid/side) ----------
 
-export function stereoWiden(channels: Float32Array[], amount: number): Float32Array[] {
+export function stereoWiden(
+  channels: Float32Array[],
+  amount: number,
+): Float32Array[] {
   if (channels.length < 2 || amount <= 0) return channels.map((c) => c.slice());
   const n = channels[0].length;
   const left = new Float32Array(n);
@@ -510,12 +587,18 @@ export function stereoWiden(channels: Float32Array[], amount: number): Float32Ar
 
 // ---------- Tremolo (amplitude modulation) ----------
 
-export function tremolo(channels: Float32Array[], sr: number, depth: number, rate: number): Float32Array[] {
+export function tremolo(
+  channels: Float32Array[],
+  sr: number,
+  depth: number,
+  rate: number,
+): Float32Array[] {
   if (depth <= 0) return channels.map((c) => c.slice());
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
     for (let i = 0; i < ch.length; i++) {
-      const mod = 1 - depth * (0.5 + 0.5 * Math.sin((2 * Math.PI * rate * i) / sr));
+      const mod =
+        1 - depth * (0.5 + 0.5 * Math.sin((2 * Math.PI * rate * i) / sr));
       out[i] = ch[i] * mod;
     }
     return out;
@@ -528,7 +611,7 @@ export function filterSweep(
   channels: Float32Array[],
   sr: number,
   startHz: number,
-  endHz: number
+  endHz: number,
 ): Float32Array[] {
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
@@ -548,7 +631,10 @@ export function filterSweep(
 
 // ---------- Sanitize output (clamp, remove NaN/Infinity, normalize) ----------
 
-export function ensureSanitary(channels: Float32Array[], peakTarget: number = 0.89): Float32Array[] {
+export function ensureSanitary(
+  channels: Float32Array[],
+  peakTarget: number = 0.89,
+): Float32Array[] {
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
     let maxAbs = 0;
@@ -570,9 +656,10 @@ export function ensureSanitary(channels: Float32Array[], peakTarget: number = 0.
 
 // ---------- Validate output (reject silent / degenerate) ----------
 
-export function validateOutput(
-  channels: Float32Array[]
-): { valid: boolean; reason?: string } {
+export function validateOutput(channels: Float32Array[]): {
+  valid: boolean;
+  reason?: string;
+} {
   if (channels.length === 0) return { valid: false, reason: "no channels" };
   const len = channels[0].length;
   if (len < 20) return { valid: false, reason: "too short" };
@@ -590,7 +677,8 @@ export function validateOutput(
   rms = Math.sqrt(rms / sampleCount);
 
   if (hasNaN) return { valid: false, reason: "NaN or Infinity detected" };
-  if (rms < 1e-7) return { valid: false, reason: `RMS too low: ${rms.toExponential(1)}` };
+  if (rms < 1e-7)
+    return { valid: false, reason: `RMS too low: ${rms.toExponential(1)}` };
 
   return { valid: true };
 }
@@ -608,7 +696,7 @@ export type WindowAnalysis = {
 export function analyzeWindow(
   channels: Float32Array[],
   start: number,
-  len: number
+  len: number,
 ): WindowAnalysis {
   const n = channels[0].length;
   const end = Math.min(start + len, n);
@@ -668,22 +756,31 @@ export function analyzeWindow(
 // ---------- Score a loop candidate ----------
 
 export function scoreLoopCandidate(analysis: WindowAnalysis): number {
-  const { rms, peakRmsRatio, frontLoadedEnergy, tailEnergy, boundarySimilarity } = analysis;
+  const {
+    rms,
+    peakRmsRatio,
+    frontLoadedEnergy,
+    tailEnergy,
+    boundarySimilarity,
+  } = analysis;
 
   const rmsScore = Math.min(1, rms * 5);
   const tailScore = Math.min(1, tailEnergy * 4);
   const boundaryScore = Math.max(0, Math.min(1, (boundarySimilarity + 1) / 2));
   const drScore = 1 - Math.max(0, Math.min(1, (peakRmsRatio - 3) / 15));
-  const frontPenalty = Math.max(0, Math.min(1, (frontLoadedEnergy - 0.3) / 0.6));
+  const frontPenalty = Math.max(
+    0,
+    Math.min(1, (frontLoadedEnergy - 0.3) / 0.6),
+  );
   const transientPenalty = Math.max(0, Math.min(1, (peakRmsRatio - 5) / 20));
 
   const score =
     rmsScore * 0.25 +
-    tailScore * 0.20 +
-    boundaryScore * 0.20 +
+    tailScore * 0.2 +
+    boundaryScore * 0.2 +
     drScore * 0.15 -
-    frontPenalty * 0.30 -
-    transientPenalty * 0.20;
+    frontPenalty * 0.3 -
+    transientPenalty * 0.2;
 
   return Math.max(-1, Math.min(1, score));
 }
@@ -693,7 +790,7 @@ export function scoreLoopCandidate(analysis: WindowAnalysis): number {
 export function findLoopCandidates(
   channels: Float32Array[],
   sr: number,
-  opts?: { minDur?: number; maxDur?: number; maxCandidates?: number }
+  opts?: { minDur?: number; maxDur?: number; maxCandidates?: number },
 ): { start: number; length: number; score: number }[] {
   const { minDur = 1, maxDur = 8, maxCandidates = 5 } = opts ?? {};
   const n = channels[0].length;
@@ -704,12 +801,14 @@ export function findLoopCandidates(
 
   // Adaptive step size
   const stepSamples =
-    sourceDur <= 30 ? Math.floor(sr * 0.25) : sourceDur <= 120 ? Math.floor(sr * 0.5) : Math.floor(sr * 1.0);
+    sourceDur <= 30
+      ? Math.floor(sr * 0.25)
+      : sourceDur <= 120
+        ? Math.floor(sr * 0.5)
+        : Math.floor(sr * 1.0);
 
   // Candidate durations to try
-  const durs = [1, 2, 3, 4, 6, 8].filter(
-    (d) => d >= minDur && d <= maxDur
-  );
+  const durs = [1, 2, 3, 4, 6, 8].filter((d) => d >= minDur && d <= maxDur);
 
   const candidates: { start: number; length: number; score: number }[] = [];
 
@@ -731,7 +830,7 @@ export function findLoopCandidates(
   for (const c of candidates) {
     if (selected.length >= maxCandidates) break;
     const overlaps = selected.some(
-      (s) => c.start < s.start + s.length && c.start + c.length > s.start
+      (s) => c.start < s.start + s.length && c.start + c.length > s.start,
     );
     if (!overlaps || c.score > 0.8) {
       if (!overlaps) selected.push(c);
@@ -750,7 +849,10 @@ export function findLoopCandidates(
 
 // ---------- Crossfade loop boundaries (equal-power) ----------
 
-export function loopCrossfade(channels: Float32Array[], crossfadeSamples: number): Float32Array[] {
+export function loopCrossfade(
+  channels: Float32Array[],
+  crossfadeSamples: number,
+): Float32Array[] {
   const len = channels[0].length;
   const fadeLen = Math.min(crossfadeSamples, Math.floor(len / 2));
   if (fadeLen <= 0) return channels.map((ch) => ch.slice());
@@ -773,12 +875,15 @@ export function extractLoopWithCrossfade(
   start: number,
   windowSamples: number,
   sr: number,
-  crossfadeMs: number = 10
+  crossfadeMs: number = 10,
 ): Float32Array[] {
   const n = channels[0].length;
   const end = Math.min(start + windowSamples, n);
   const actualLen = end - start;
-  const fadeLen = Math.min(Math.floor((sr * crossfadeMs) / 1000), Math.floor(actualLen / 2));
+  const fadeLen = Math.min(
+    Math.floor((sr * crossfadeMs) / 1000),
+    Math.floor(actualLen / 2),
+  );
 
   const extracted = channels.map((ch) => ch.slice(start, end));
   return loopCrossfade(extracted, fadeLen);
@@ -786,7 +891,10 @@ export function extractLoopWithCrossfade(
 
 // ---------- Repeat a buffer to fill a target duration ----------
 
-export function repeatToDuration(channels: Float32Array[], targetSamples: number): Float32Array[] {
+export function repeatToDuration(
+  channels: Float32Array[],
+  targetSamples: number,
+): Float32Array[] {
   const loopLen = channels[0].length;
   if (loopLen === 0) return channels;
 
@@ -799,8 +907,15 @@ export function repeatToDuration(channels: Float32Array[], targetSamples: number
 
 // ---------- Make AudioBufferData ----------
 
-export function makeAudioData(data: AudioBufferData, newChannels: Float32Array[]): AudioBufferData {
-  return { name: data.name, sampleRate: data.sampleRate, channels: newChannels };
+export function makeAudioData(
+  data: AudioBufferData,
+  newChannels: Float32Array[],
+): AudioBufferData {
+  return {
+    name: data.name,
+    sampleRate: data.sampleRate,
+    channels: newChannels,
+  };
 }
 
 // ---------- Haas effect (randomized per-channel delay for stereo widening) ----------
@@ -815,8 +930,8 @@ export function haasEffect(
   if (maxDelaySamples <= 1) return channels.map((c) => c.slice());
 
   // Each channel gets a random delay between 1..maxDelayMs ms
-  const delays = channels.map(() =>
-    1 + Math.floor(Math.random() * (maxDelaySamples - 1)),
+  const delays = channels.map(
+    () => 1 + Math.floor(Math.random() * (maxDelaySamples - 1)),
   );
 
   return channels.map((ch, ci) => {
@@ -832,7 +947,11 @@ export function haasEffect(
 export function finalWarm(
   channels: Float32Array[],
   sr: number,
-  opts: { highpassHz?: number; lowpassHz?: number; softClipDrive?: number } = {},
+  opts: {
+    highpassHz?: number;
+    lowpassHz?: number;
+    softClipDrive?: number;
+  } = {},
 ): Float32Array[] {
   const hp = opts.highpassHz ?? 20;
   const lp = opts.lowpassHz ?? 60;

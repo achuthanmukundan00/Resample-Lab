@@ -22,17 +22,17 @@ The Worker sits on the watchyourtemper.com zone, intercepts `/rlab` paths, strip
 
 **Dashboard:** Cloudflare Dashboard → Workers & Pages → Resample-Lab Pages project
 
-| Setting | Value |
-|---------|-------|
-| Framework preset | None (manual) |
-| Build command | `pnpm build` |
-| Build output directory | `out` |
-| Root directory | (leave blank — uses repo root) |
+| Setting                | Value                          |
+| ---------------------- | ------------------------------ |
+| Framework preset       | None (manual)                  |
+| Build command          | `pnpm build`                   |
+| Build output directory | `out`                          |
+| Root directory         | (leave blank — uses repo root) |
 
 **Environment variable (must be set in Pages dashboard):**
 
-| Name | Value |
-|------|-------|
+| Name                    | Value   |
+| ----------------------- | ------- |
 | `NEXT_PUBLIC_BASE_PATH` | `/rlab` |
 
 **Deploy:** Push to the connected GitHub branch, or manually:
@@ -125,12 +125,12 @@ Check the output:
 
 Test these URLs:
 
-| URL | Expected result |
-|-----|----------------|
-| `https://watchyourtemper.com/rlab/` | Resample-Lab loads |
-| `https://watchyourtemper.com/rlab` | Redirects to `/rlab/` |
-| `https://watchyourtemper.com/rlab/wyt-logo.png` | Logo image |
-| `https://watchyourtemper.com/rlab/docs` | Documentation page |
+| URL                                             | Expected result       |
+| ----------------------------------------------- | --------------------- |
+| `https://watchyourtemper.com/rlab/`             | Resample-Lab loads    |
+| `https://watchyourtemper.com/rlab`              | Redirects to `/rlab/` |
+| `https://watchyourtemper.com/rlab/wyt-logo.png` | Logo image            |
+| `https://watchyourtemper.com/rlab/docs`         | Documentation page    |
 
 In browser DevTools **Network** tab, verify:
 

@@ -100,5 +100,7 @@ export function buildZip(files: { name: string; data: Uint8Array }[]): Blob {
   u32(e, 16, centralOffset);
   u16(e, 20, 0); // comment length
 
-  return new Blob([...localHeaders, ...centralEntries, eocd] as BlobPart[], { type: "application/zip" });
+  return new Blob([...localHeaders, ...centralEntries, eocd] as BlobPart[], {
+    type: "application/zip",
+  });
 }

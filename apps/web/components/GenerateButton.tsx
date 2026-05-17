@@ -1,19 +1,22 @@
-'use client'
+"use client";
 
 interface GenerateButtonProps {
-  disabled: boolean
-  isProcessing: boolean
+  disabled: boolean;
+  isProcessing: boolean;
 }
 
-export default function GenerateButton({ disabled, isProcessing }: GenerateButtonProps) {
+export default function GenerateButton({
+  disabled,
+  isProcessing,
+}: GenerateButtonProps) {
   return (
     <button
       type="submit"
       disabled={disabled}
       className={`w-full py-3 px-6 rounded-lg font-medium text-sm transition-all ${
         disabled
-          ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-          : 'bg-accent text-black hover:bg-accent-glow active:scale-[0.98] shadow-lg shadow-accent-dim/20'
+          ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+          : "bg-accent text-black hover:bg-accent-glow active:scale-[0.98] shadow-lg shadow-accent-dim/20"
       }`}
     >
       {isProcessing ? (
@@ -36,8 +39,8 @@ export default function GenerateButton({ disabled, isProcessing }: GenerateButto
           Generating...
         </span>
       ) : (
-        'Generate Pack'
+        "Generate Pack"
       )}
     </button>
-  )
+  );
 }

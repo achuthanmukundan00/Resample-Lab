@@ -42,6 +42,7 @@ export type WorkerRequest = {
   files: AudioBufferData[];
   preset: string;
   chaos: number;
+  lengthMode?: string;
 };
 
 export type WorkerProgress =

@@ -1,155 +1,161 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import UploadDropzone from '@/components/UploadDropzone'
-import PresetCard from '@/components/PresetCard'
-import ChaosSlider from '@/components/ChaosSlider'
-import LocalFirstBadge from '@/components/LocalFirstBadge'
-import GenerateButton from '@/components/GenerateButton'
-import PackStatusCard from '@/components/PackStatusCard'
-import ManifestPreview from '@/components/ManifestPreview'
-import Footer from '@/components/Footer'
-import { PRESETS } from '@/lib/presets'
-import { assetPath } from '@/lib/paths'
-import { AudioBufferData, PackManifest } from '@/lib/dsp/types'
-import { Capabilities } from '@/lib/types'
+import { useCallback, useEffect, useRef, useState } from "react";
+import UploadDropzone from "@/components/UploadDropzone";
+import PresetCard from "@/components/PresetCard";
+import ChaosSlider from "@/components/ChaosSlider";
+import LengthModeSelector from "@/components/LengthModeSelector";
+import type { LengthMode } from "@/components/LengthModeSelector";
+import LocalFirstBadge from "@/components/LocalFirstBadge";
+import GenerateButton from "@/components/GenerateButton";
+import PackStatusCard from "@/components/PackStatusCard";
+import ManifestPreview from "@/components/ManifestPreview";
+import Footer from "@/components/Footer";
+import { PRESETS } from "@/lib/presets";
+import { assetPath } from "@/lib/paths";
+import { AudioBufferData, PackManifest } from "@/lib/dsp/types";
+import { Capabilities } from "@/lib/types";
 
 export default function Home() {
-  const [files, setFiles] = useState<File[]>([])
-  const [selectedPreset, setSelectedPreset] = useState<string>(PRESETS[0].id)
-  const [chaos, setChaos] = useState(0.33)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
+  const [files, setFiles] = useState<File[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState<string>(PRESETS[0].id);
+  const [chaos, setChaos] = useState(0.33);
+  const [lengthMode, setLengthMode] = useState<LengthMode>("medium");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
 
   // Local processing state
-  const [localProgress, setLocalProgress] = useState(0)
-  const [localMessage, setLocalMessage] = useState('')
-  const [localStatus, setLocalStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle')
-  const [zipBlob, setZipBlob] = useState<Blob | null>(null)
-  const [manifest, setManifest] = useState<PackManifest | null>(null)
+  const [localProgress, setLocalProgress] = useState(0);
+  const [localMessage, setLocalMessage] = useState("");
+  const [localStatus, setLocalStatus] = useState<
+    "idle" | "processing" | "complete" | "error"
+  >("idle");
+  const [zipBlob, setZipBlob] = useState<Blob | null>(null);
+  const [manifest, setManifest] = useState<PackManifest | null>(null);
 
-  const workerRef = useRef<Worker | null>(null)
-  const audioCtxRef = useRef<AudioContext | null>(null)
+  const workerRef = useRef<Worker | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     setCapabilities({
       presets: PRESETS,
       chaos_levels: { min: 0, max: 1, step: 0.01 },
-      output_formats: ['wav'],
-      accepted_extensions: ['wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg'],
+      output_formats: ["wav"],
+      accepted_extensions: ["wav", "aiff", "flac", "mp3", "m4a", "ogg"],
       max_upload_mb: 50,
       max_duration_seconds: 600,
       tools: {},
-    })
-  }, [])
+    });
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      workerRef.current?.terminate()
-      audioCtxRef.current?.close()
-    }
-  }, [])
+      workerRef.current?.terminate();
+      audioCtxRef.current?.close();
+    };
+  }, []);
 
   const handleDownload = useCallback(() => {
-    if (!zipBlob) return
-    const url = URL.createObjectURL(zipBlob)
-    const a = document.createElement('a')
-    a.href = url
+    if (!zipBlob) return;
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
     const base =
       files.length === 1
-        ? files[0].name.replace(/\.[^.]+$/, '')
-        : `resample-pack-${Date.now()}`
-    const chaosInt = Math.round(chaos * 100)
-    a.download = `${base}__${selectedPreset}__chaos${chaosInt}.zip`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }, [zipBlob, files, selectedPreset, chaos])
+        ? files[0].name.replace(/\.[^.]+$/, "")
+        : `resample-pack-${Date.now()}`;
+    const chaosInt = Math.round(chaos * 100);
+    a.download = `${base}__${selectedPreset}__chaos${chaosInt}__${lengthMode}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [zipBlob, files, selectedPreset, chaos, lengthMode]);
 
   const handleSubmit = useCallback(async () => {
-    if (files.length === 0 || !selectedPreset || isProcessing) return
+    if (files.length === 0 || !selectedPreset || isProcessing) return;
 
-    setIsProcessing(true)
-    setError(null)
-    setLocalStatus('processing')
-    setLocalProgress(0)
-    setLocalMessage('Decoding audio…')
-    setZipBlob(null)
-    setManifest(null)
+    setIsProcessing(true);
+    setError(null);
+    setLocalStatus("processing");
+    setLocalProgress(0);
+    setLocalMessage("Decoding audio…");
+    setZipBlob(null);
+    setManifest(null);
 
     try {
       // 1. Decode audio files in the browser
       if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioContext()
+        audioCtxRef.current = new AudioContext();
       }
-      const ctx = audioCtxRef.current
+      const ctx = audioCtxRef.current;
 
-      const decodedFiles: AudioBufferData[] = []
+      const decodedFiles: AudioBufferData[] = [];
       for (const file of files) {
-        const buf = await file.arrayBuffer()
-        const audioBuf = await ctx.decodeAudioData(buf)
-        const channels: Float32Array[] = []
+        const buf = await file.arrayBuffer();
+        const audioBuf = await ctx.decodeAudioData(buf);
+        const channels: Float32Array[] = [];
         for (let i = 0; i < audioBuf.numberOfChannels; i++) {
-          channels.push(audioBuf.getChannelData(i))
+          channels.push(audioBuf.getChannelData(i));
         }
         decodedFiles.push({
           name: file.name,
           sampleRate: audioBuf.sampleRate,
           channels,
-        })
+        });
       }
 
       // 2. Terminate previous worker
-      workerRef.current?.terminate()
+      workerRef.current?.terminate();
 
       // 3. Create processing worker
       const worker = new Worker(
-        new URL('../lib/dsp/packWorker.ts', import.meta.url),
-      )
-      workerRef.current = worker
+        new URL("../lib/dsp/packWorker.ts", import.meta.url),
+      );
+      workerRef.current = worker;
 
       worker.onmessage = (e) => {
-        const msg = e.data
-        if (msg.type === 'progress') {
-          setLocalProgress(msg.value)
-          setLocalMessage(msg.message)
-        } else if (msg.type === 'complete') {
-          setZipBlob(msg.zipBlob)
-          setManifest(msg.manifest)
-          setLocalStatus('complete')
-          setIsProcessing(false)
-        } else if (msg.type === 'error') {
-          setError(msg.error)
-          setLocalStatus('error')
-          setIsProcessing(false)
+        const msg = e.data;
+        if (msg.type === "progress") {
+          setLocalProgress(msg.value);
+          setLocalMessage(msg.message);
+        } else if (msg.type === "complete") {
+          setZipBlob(msg.zipBlob);
+          setManifest(msg.manifest);
+          setLocalStatus("complete");
+          setIsProcessing(false);
+        } else if (msg.type === "error") {
+          setError(msg.error);
+          setLocalStatus("error");
+          setIsProcessing(false);
         }
-      }
+      };
 
       // 4. Start processing
-      setLocalMessage('Generating samples…')
+      setLocalMessage("Generating samples…");
       worker.postMessage({
-        type: 'generate',
+        type: "generate",
         files: decodedFiles,
         preset: selectedPreset,
         chaos,
-      })
+        lengthMode,
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Processing failed')
-      setLocalStatus('error')
-      setIsProcessing(false)
+      setError(e instanceof Error ? e.message : "Processing failed");
+      setLocalStatus("error");
+      setIsProcessing(false);
     }
-  }, [files, selectedPreset, chaos, isProcessing])
+  }, [files, selectedPreset, chaos, lengthMode, isProcessing]);
 
   const handleReset = useCallback(() => {
-    setLocalStatus('idle')
-    setLocalProgress(0)
-    setZipBlob(null)
-    setManifest(null)
-    setError(null)
-  }, [])
+    setLocalStatus("idle");
+    setLocalProgress(0);
+    setZipBlob(null);
+    setManifest(null);
+    setError(null);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -157,9 +163,13 @@ export default function Home() {
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-start sm:items-center gap-4 flex-wrap">
-            <a href="https://watchyourtemper.com" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://watchyourtemper.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <img
-                src={assetPath('/wyt-logo.png')}
+                src={assetPath("/wyt-logo.png")}
                 alt="watchyourtemper"
                 className="h-20 w-20 sm:h-40 sm:w-40 object-contain opacity-85 shrink-0 hover:opacity-100 transition-opacity"
               />
@@ -185,7 +195,12 @@ export default function Home() {
             onFilesSelected={setFiles}
             acceptedExtensions={
               capabilities?.accepted_extensions || [
-                'wav', 'aiff', 'flac', 'mp3', 'm4a', 'ogg',
+                "wav",
+                "aiff",
+                "flac",
+                "mp3",
+                "m4a",
+                "ogg",
               ]
             }
             maxUploadMb={capabilities?.max_upload_mb || 50}
@@ -209,18 +224,19 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Chaos + Privacy Note */}
+        {/* Chaos + Length + Privacy Note */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div>
             <ChaosSlider value={chaos} onChange={setChaos} />
           </div>
-          <div className="flex flex-col justify-end">
-            <p className="text-xs text-zinc-600 italic">
-              All processing runs in your browser. Your audio is never uploaded
-              to any server.
-            </p>
+          <div>
+            <LengthModeSelector value={lengthMode} onChange={setLengthMode} />
           </div>
         </div>
+        <p className="text-xs text-zinc-600 italic -mt-3">
+          All processing runs in your browser. Your audio is never uploaded
+          to any server.
+        </p>
 
         {/* Error */}
         {error && (
@@ -232,8 +248,8 @@ export default function Home() {
         {/* Generate */}
         <form
           onSubmit={(e) => {
-            e.preventDefault()
-            handleSubmit()
+            e.preventDefault();
+            handleSubmit();
           }}
         >
           <GenerateButton
@@ -243,7 +259,7 @@ export default function Home() {
         </form>
 
         {/* Processing Status */}
-        {(localStatus === 'processing' || localStatus === 'complete') && (
+        {(localStatus === "processing" || localStatus === "complete") && (
           <PackStatusCard
             localStatus={localStatus}
             localProgress={localProgress}
@@ -255,12 +271,14 @@ export default function Home() {
         )}
 
         {/* Manifest preview after completion */}
-        {localStatus === 'complete' && manifest && (
-          <ManifestPreview manifest={manifest as unknown as Record<string, unknown>} />
+        {localStatus === "complete" && manifest && (
+          <ManifestPreview
+            manifest={manifest as unknown as Record<string, unknown>}
+          />
         )}
       </main>
 
       <Footer />
     </div>
-  )
+  );
 }

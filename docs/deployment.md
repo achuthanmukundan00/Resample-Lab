@@ -44,14 +44,14 @@ npx wrangler pages deploy out --branch main
 
 Since the output is plain HTML + JS + CSS, you can deploy anywhere:
 
-| Host | Notes |
-|------|-------|
-| Cloudflare Pages | Free, global CDN, auto-deploys from GitHub |
-| Vercel | Free tier, configure output directory as `apps/web/out` |
-| Netlify | Drag-and-drop `out/` folder or connect GitHub |
-| GitHub Pages | Push `out/` to `gh-pages` branch |
-| S3 + CloudFront | `aws s3 sync out/ s3://your-bucket` |
-| Any web server | Copy `out/` contents to your server's document root |
+| Host             | Notes                                                   |
+| ---------------- | ------------------------------------------------------- |
+| Cloudflare Pages | Free, global CDN, auto-deploys from GitHub              |
+| Vercel           | Free tier, configure output directory as `apps/web/out` |
+| Netlify          | Drag-and-drop `out/` folder or connect GitHub           |
+| GitHub Pages     | Push `out/` to `gh-pages` branch                        |
+| S3 + CloudFront  | `aws s3 sync out/ s3://your-bucket`                     |
+| Any web server   | Copy `out/` contents to your server's document root     |
 
 No special server configuration required — no rewrites, no redirects, no SPA fallback. The app has one route (`/`) plus `/docs`, both statically generated.
 
