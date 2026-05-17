@@ -1,65 +1,64 @@
 # Deployment
 
 Resample-Lab is a **fully static frontend** — the entire DSP engine runs in the browser with no backend required.
+No API server, no KV, no Durable Objects, no request transformations.
 
 ---
 
-## Quick Deploy (Cloudflare Pages)
+## Canonical Deployment (Cloudflare Pages)
+
+The app is deployed at **[rlab.watchyourtemper.com](https://rlab.watchyourtemper.com)** via a Cloudflare Pages custom domain.
+
+### Deploy steps
 
 1. Push the repo to GitHub
-2. Go to **Cloudflare Dashboard → Workers & Pages → Create → Pages**
-3. Connect your GitHub repository
-4. Build settings:
-   - **Framework preset**: None (use manual)
-   - **Build command**: `cd apps/web && pnpm install && pnpm build`
-   - **Build output**: `apps/web/out`
-5. Deploy
+2. Go to **Cloudflare Dashboard → Workers & Pages → resample-lab → Deployments**
+3. The `main` branch auto-deploys from GitHub
+4. Custom domain `rlab.watchyourtemper.com` is configured under **resample-lab → Custom domains**
 
-That's it. No environment variables. No database. No API keys.
+### Build configuration
 
----
+| Setting            | Value                             |
+| ------------------ | --------------------------------- |
+| Framework preset   | None (manual)                     |
+| Build command      | `cd apps/web && pnpm install && pnpm build` |
+| Build output       | `apps/web/out`                    |
+| Root directory     | (leave blank — repo root)         |
 
-## Manual Build
+No environment variables, no `NEXT_PUBLIC_BASE_PATH`, no Worker proxy.
+
+### Local build
 
 ```bash
-git clone https://github.com/achuthanmukundan00/Resample-Lab.git
-cd Resample-Lab/apps/web
+cd apps/web
 pnpm install
 pnpm build    # outputs static export to apps/web/out/
 ```
 
-The `out/` directory is a fully self-contained static site. Serve it from any web server, S3 bucket, or CDN:
+The `out/` directory is a fully self-contained static site. Serve it locally to verify:
 
 ```bash
-# Test locally
 pnpm start
-
-# Deploy to any static host
-npx wrangler pages deploy out --branch main
 ```
 
 ---
 
-## Any Static Host
+## Verification checklist
 
-Since the output is plain HTML + JS + CSS, you can deploy anywhere:
+Before marking a deployment as complete:
 
-| Host             | Notes                                                   |
-| ---------------- | ------------------------------------------------------- |
-| Cloudflare Pages | Free, global CDN, auto-deploys from GitHub              |
-| Vercel           | Free tier, configure output directory as `apps/web/out` |
-| Netlify          | Drag-and-drop `out/` folder or connect GitHub           |
-| GitHub Pages     | Push `out/` to `gh-pages` branch                        |
-| S3 + CloudFront  | `aws s3 sync out/ s3://your-bucket`                     |
-| Any web server   | Copy `out/` contents to your server's document root     |
-
-No special server configuration required — no rewrites, no redirects, no SPA fallback. The app has one route (`/`) plus `/docs`, both statically generated.
+- [ ] `https://rlab.watchyourtemper.com/` returns 200
+- [ ] JS/CSS assets return correct MIME types (no `application/octet-stream`)
+- [ ] No requests to `/rlab/_next/...` appear in the network tab
+- [ ] Upload + preset generation works end-to-end
+- [ ] Browser console has no MIME type or asset-loading errors
 
 ---
 
-## Why No Backend?
+## Why Static?
 
-The original version of Resample-Lab used a Python FastAPI backend with ffmpeg + numpy/scipy for DSP. The current version runs all processing **entirely in the browser** via Web Workers. This means:
+The original version of Resample-Lab used a Python FastAPI backend with ffmpeg + numpy/scipy for DSP.
+The current version runs all processing **entirely in the browser** via Web Workers. This means:
 
 - Zero server costs
 - No data ever leaves the user's machine

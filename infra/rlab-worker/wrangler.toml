@@ -1,7 +1,0 @@
-name = "watchyourtemper-rlab-proxy"
-main = "src/index.js"
-compatibility_date = "2026-05-16"
-
-routes = [
-  { pattern = "watchyourtemper.com/rlab*", zone_name = "watchyourtemper.com" }
-]

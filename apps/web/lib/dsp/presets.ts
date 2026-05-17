@@ -1019,7 +1019,7 @@ function bitrotDirt(
 function pitchWreckage(
   files: AudioBufferData[],
   chaos: number,
-  _onProgress?: (v: number, msg: string) => void,
+  onProgress?: (v: number, msg: string) => void,
   _lengthMode?: LengthMode,
 ): GeneratedSample[] {
   const outputs: (GeneratedSample | null)[] = [];
@@ -1032,9 +1032,10 @@ function pitchWreckage(
 
     // 1. Sub beast layer — octave down + sub-heavy tape + convolution
     const sd = -12 - Math.floor(lanes.mutation * 12);
+    onProgress?.(0.08, "Pitch-shifting sub beast layer…");
     let beast = T.resampleChannels(
       stereo,
-      1 / 2 ** (sd / 12),
+      2 ** (sd / 12),
       stereo[0].length,
     );
     beast = applyTape(beast, {
@@ -1062,10 +1063,11 @@ function pitchWreckage(
     );
 
     // 2. Glass octave tail — octave up + bandpass + dark room
+    onProgress?.(0.25, "Glassing octave up…");
     const su = 12 + Math.floor(lanes.mutation * 12);
     let glass = T.resampleChannels(
       stereo,
-      1 / 2 ** (su / 12),
+      2 ** (su / 12),
       stereo[0].length,
     );
     glass = T.bandpass(glass, sr, 500, 10000);
@@ -1091,14 +1093,15 @@ function pitchWreckage(
     );
 
     // 3. Detuned metal pair — dual layer + metallic reverb
+    onProgress?.(0.35, "Detuning metal pair…");
     const detune1 = T.resampleChannels(
       stereo,
-      1 / 2 ** (-18 / 12),
+      2 ** (-18 / 12),
       stereo[0].length,
     );
     const detune2 = T.resampleChannels(
       stereo,
-      1 / 2 ** ((18 + lanes.instability * 6) / 12),
+      2 ** ((18 + lanes.instability * 6) / 12),
       stereo[0].length,
     );
     const dual = detune1.map((ch, ci) => {
@@ -1133,9 +1136,10 @@ function pitchWreckage(
     );
 
     // 4. Falling pitch smear — pitch drift + convolution
+    onProgress?.(0.48, "Smearing falling pitch…");
     let fall = T.resampleChannels(
       stereo,
-      1 / 2 ** ((-lanes.mutation * 8) / 12),
+      2 ** ((-lanes.mutation * 8) / 12),
       stereo[0].length,
     );
     fall = applyTape(fall, {
@@ -1410,7 +1414,7 @@ function impactRiserMutator(
     const si = -24 - Math.floor(lanes.mutation * 12);
     let pressure = T.resampleChannels(
       stereo,
-      1 / 2 ** (si / 12),
+      2 ** (si / 12),
       stereo[0].length,
     );
     pressure = applyTape(pressure, {
@@ -1498,7 +1502,7 @@ function impactRiserMutator(
     onProgress?.(0.7, "Sub collapse…");
     let subCollapse = T.resampleChannels(
       stereo,
-      1 / 2 ** (-30 / 12),
+      2 ** (-30 / 12),
       stereo[0].length,
     );
     subCollapse = applyTape(subCollapse, {
