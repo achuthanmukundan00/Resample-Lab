@@ -56,28 +56,4 @@ export interface Capabilities {
   >;
 }
 
-export interface PackCreateResponse {
-  pack_id: string;
-  status: string;
-  message: string;
-}
 
-export interface PackStatusResponse {
-  pack_id: string;
-  status: "queued" | "processing" | "completed" | "failed" | "deleted";
-  progress: number;
-  message: string;
-  error: string | null;
-  manifest: Record<string, unknown> | null;
-  zip_path: string | null;
-  source_files: string[];
-  preset: string;
-  chaos: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PackListResponse {
-  items: PackStatusResponse[];
-  total: number;
-}

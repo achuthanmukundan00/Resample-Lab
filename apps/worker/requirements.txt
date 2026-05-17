@@ -1,5 +1,0 @@
-rq
-redis
-python-dotenv
-black
-isort

@@ -61,7 +61,7 @@ cd infra/rlab-worker
 npx wrangler deploy
 ```
 
-> ⚠️ **Critical:** Always deploy from `infra/rlab-worker/`, never from the repo root. Deploying from root makes Cloudflare detect the monorepo/Python project structure, causing it to run `pip install .`, which fails because setuptools discovers conflicting top-level packages (`apps`, `infra`, `alembic`, `node_modules`).
+> ⚠️ **Critical:** Always deploy from `infra/rlab-worker/`, never from the repo root. Deploying from root causes Cloudflare to detect the monorepo structure and interpret it as a build project rather than a trivial Worker, which leads to build failures.
 
 ### Dry run (no-op check)
 
@@ -144,7 +144,7 @@ In browser DevTools **Network** tab, verify:
 
 ## Risks & gotchas
 
-- **Deploy from wrong directory:** Deploying the Worker from the repo root triggers Python dependency detection, causing a `pip install` failure. Always `cd infra/rlab-worker` first.
+- **Deploy from wrong directory:** Deploying the Worker from the repo root triggers monorepo build detection and fails. Always `cd infra/rlab-worker` first.
 - **Placeholder origin:** The Worker code contains a placeholder `YOUR-RESAMPLE-LAB-PAGES-DOMAIN.pages.dev`. This **must** be replaced with the actual Pages project URL before the Worker will function.
 - **Route precedence:** The Worker route `watchyourtemper.com/rlab*` must not conflict with any existing routes on the watchyourtemper.com zone. If there's already a catch-all Worker, ensure this route takes priority.
 - **Static export only:** This setup assumes `output: "export"` in Next.js config. If that changes (e.g. to `output: "standalone"`), the Worker proxy logic will need updating.
