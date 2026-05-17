@@ -50,6 +50,10 @@ interface RenderResult {
   clippingSampleCount: number;
   fileSizeBytes: number;
   warnings: string[];
+  /** True when the sample was filtered out by validation (e.g. RMS too low). */
+  isSkipped?: boolean;
+  /** Reason given by validateOutput for the skip. */
+  skipReason?: string;
 }
 
 interface ReportData {
@@ -58,9 +62,12 @@ interface ReportData {
   presets: string[];
   chaosValues: number[];
   lengthModes: string[];
+  totalPresetJobs: number;
   totalRenders: number;
   results: RenderResult[];
   summary: {
+    wavFilesWritten: number;
+    skippedOutputs: number;
     failedRenders: number;
     silentFiles: number;
     clippingWarnings: number;
@@ -231,11 +238,13 @@ function generateMarkdownReport(report: ReportData, _outputDir: string): string 
   // ── Summary ──
   lines.push("## Summary");
   lines.push("");
-  lines.push(`- **Total renders**: ${report.totalRenders}`);
   lines.push(`- **Input files**: ${report.inputFiles.length}`);
   lines.push(`- **Presets**: ${report.presets.join(", ")}`);
   lines.push(`- **Chaos values**: ${report.chaosValues.join(", ")}`);
   lines.push(`- **Length modes**: ${report.lengthModes.join(", ")}`);
+  lines.push(`- **Preset jobs attempted**: ${report.totalPresetJobs}`);
+  lines.push(`- **WAV files written**: ${report.summary.wavFilesWritten}`);
+  lines.push(`- **Skipped (unusable)**: ${report.summary.skippedOutputs}`);
   lines.push(`- **Failed renders**: ${report.summary.failedRenders}`);
   lines.push(`- **Silent/near-silent files**: ${report.summary.silentFiles}`);
   lines.push(`- **Clipping warnings**: ${report.summary.clippingWarnings}`);
@@ -265,6 +274,7 @@ function generateMarkdownReport(report: ReportData, _outputDir: string): string 
   // ── Warning counts ──
   const presetWarnings: Record<string, number> = {};
   for (const r of report.results) {
+    if (r.isSkipped) continue;
     if (r.warnings.length > 0) {
       presetWarnings[r.preset] = (presetWarnings[r.preset] || 0) + 1;
     }
@@ -280,8 +290,20 @@ function generateMarkdownReport(report: ReportData, _outputDir: string): string 
     lines.push("");
   }
 
+  // ── Skipped / unusable outputs ──
+  const skippedResults = report.results.filter((r) => r.isSkipped);
+  if (skippedResults.length > 0) {
+    lines.push("## Skipped / Unusable Outputs");
+    lines.push("These samples were rejected by the validation stage (e.g. RMS too low, too short, NaN). They produce no WAV file.");
+    lines.push("");
+    for (const r of skippedResults) {
+      lines.push(`- ${r.inputFile} / **${r.preset}** / chaos=${r.chaos} / ${r.lengthMode} → \`${r.outputFilename}\` — ${r.skipReason}`);
+    }
+    lines.push("");
+  }
+
   // ── Problematic outputs ──
-  const silentResults = report.results.filter((r) => r.isSilent);
+  const silentResults = report.results.filter((r) => r.isSilent && !r.isSkipped);
   if (silentResults.length > 0) {
     lines.push("## Silent / Near-Silent Outputs");
     lines.push("These outputs may need attention — very low RMS suggests the processing chain removed too much signal.");
@@ -496,11 +518,12 @@ async function main() {
   }
 
   const totalCombos = wavFiles.length * args.presets.length * args.chaosValues.length * args.lengthModes.length;
-  console.log(`\nRender-Audit: ${wavFiles.length} files × ${args.presets.length} presets × ${args.chaosValues.length} chaos × ${args.lengthModes.length} lengths = ${totalCombos} total renders`);
+  console.log(`\nRender-Audit: ${wavFiles.length} files × ${args.presets.length} presets × ${args.chaosValues.length} chaos × ${args.lengthModes.length} lengths = ${totalCombos} preset jobs`);
   if (args.quick) console.log("  Quick mode: single chaos/length per preset for fast spot-checking");
   console.log(`  Presets: ${args.presets.join(", ")}`);
   console.log(`  Chaos:   ${args.chaosValues.join(", ")}`);
   console.log(`  Lengths: ${args.lengthModes.join(", ")}`);
+  console.log(`  Note: each preset job may produce multiple WAV outputs (4–10 per job).`);
 
   const results: RenderResult[] = [];
   fs.mkdirSync(outputDir, { recursive: true });
@@ -524,6 +547,21 @@ async function main() {
     for (const presetId of args.presets) {
       for (const chaos of args.chaosValues) {
         for (const lengthMode of args.lengthModes) {
+          const capturedSkips: { filename: string; reason: string }[] = [];
+          const origWarn = console.warn;
+          console.warn = (...warnArgs: unknown[]) => {
+            const msg = warnArgs.join(" ");
+            if (msg.startsWith("[presets] Skipping")) {
+              const rest = msg.replace(/^\[presets\] Skipping /, "");
+              const colonIdx = rest.indexOf(": ");
+              capturedSkips.push({
+                filename: colonIdx >= 0 ? rest.slice(0, colonIdx) : rest,
+                reason: colonIdx >= 0 ? rest.slice(colonIdx + 2) : "unknown",
+              });
+            }
+            origWarn.apply(console, warnArgs);
+          };
+
           try {
             const { samples } = generatePack([audioData], presetId, chaos, () => {}, lengthMode);
             const outDir = path.join(outputDir, inputStem, presetId, `chaos-${chaos.toFixed(1)}`, `length-${lengthMode}`);
@@ -555,6 +593,31 @@ async function main() {
                 warnings,
               });
             }
+
+            // Record skipped outputs captured from console.warn during generatePack
+            for (const skip of capturedSkips) {
+              results.push({
+                inputFile: wavFile,
+                preset: presetId,
+                outputFilename: skip.filename,
+                chaos,
+                lengthMode,
+                durationSeconds: 0,
+                sampleRate: 0,
+                channelCount: 0,
+                peak: 0,
+                rms: 0,
+                hasNaN: false,
+                hasInfinity: false,
+                isSilent: true,
+                isClipping: false,
+                clippingSampleCount: 0,
+                fileSizeBytes: 0,
+                warnings: [],
+                isSkipped: true,
+                skipReason: skip.reason,
+              });
+            }
           } catch (err) {
             console.error(`  ✗ ${presetId} chaos=${chaos} ${lengthMode}: ${err}`);
             results.push({
@@ -572,6 +635,8 @@ async function main() {
             });
           }
 
+          console.warn = origWarn;
+
           rendersDone++;
           if (rendersDone % 10 === 0 || rendersDone === totalCombos) {
             const pct = Math.round((rendersDone / totalCombos) * 100);
@@ -586,8 +651,10 @@ async function main() {
   process.stdout.write("\n");
 
   // ── Build report ──
+  const wavFilesWritten = results.filter((r) => !r.isSkipped && !r.warnings.includes("render-error")).length;
+  const skippedOutputs = results.filter((r) => r.isSkipped).length;
   const failedRenders = results.filter((r) => r.warnings.includes("render-error")).length;
-  const silentFiles = results.filter((r) => r.isSilent && !r.warnings.includes("render-error")).length;
+  const silentFiles = results.filter((r) => r.isSilent && !r.isSkipped && !r.warnings.includes("render-error")).length;
   const clippingWarnings = results.filter((r) => r.isClipping).length;
   const nanInfinityCount = results.filter((r) => r.hasNaN || r.hasInfinity).length;
 
@@ -597,9 +664,10 @@ async function main() {
     presets: args.presets,
     chaosValues: args.chaosValues,
     lengthModes: args.lengthModes,
+    totalPresetJobs: totalCombos,
     totalRenders: results.length,
     results,
-    summary: { failedRenders, silentFiles, clippingWarnings, nanInfinityCount },
+    summary: { wavFilesWritten, skippedOutputs, failedRenders, silentFiles, clippingWarnings, nanInfinityCount },
   };
 
   const reportJsonPath = path.join(outputDir, "report.json");
@@ -612,11 +680,13 @@ async function main() {
   console.log(`Report MD  → ${reportMdPath}`);
 
   console.log(`\n${"=".repeat(50)}`);
-  console.log(`Total renders:  ${results.length}`);
-  console.log(`Failed:         ${failedRenders}`);
-  console.log(`Silent:         ${silentFiles}`);
-  console.log(`Clipping:       ${clippingWarnings}`);
-  console.log(`NaN/Infinity:   ${nanInfinityCount}`);
+  console.log(`Preset jobs:   ${totalCombos}`);
+  console.log(`WAV outputs:   ${wavFilesWritten}`);
+  console.log(`Skipped:       ${skippedOutputs}`);
+  console.log(`Failed:        ${failedRenders}`);
+  console.log(`Silent:        ${silentFiles}`);
+  console.log(`Clipping:      ${clippingWarnings}`);
+  console.log(`NaN/Infinity:  ${nanInfinityCount}`);
   console.log(`${"=".repeat(50)}`);
   console.log("Done. Browse the output directory and listen to the WAV files.");
 }
