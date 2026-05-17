@@ -8,11 +8,16 @@ Issues, PRs, and forks welcome. Resample-Lab is an experimental DSP sandbox and 
 
 The entire DSP pipeline runs client-side in a Web Worker:
 
-1. **`lib/dsp/transforms.ts`** — 35+ atomic transform functions operating on `Float32Array[]` channels (biquad filters, WSOLA stretch, convolution reverb, granular slicing, tape wow, bitcrushing, etc.)
-2. **`lib/dsp/presets.ts`** — 8 preset recipes that chain transforms together, each returning `GeneratedSample[]` with category metadata
-3. **`lib/dsp/packWorker.ts`** — Web Worker entry: receives decoded audio → runs a preset → encodes WAVs → builds ZIP → posts Blob back
-4. **`lib/dsp/wav.ts`** — WAV encoding (48 kHz, 16-bit, interleaved)
-5. **`lib/dsp/zip.ts`** — ZIP building without external dependencies
+1. **`lib/dsp/transforms.ts`** — 40+ atomic transform functions: biquad filters, WSOLA, convolution, bitcrush, tape wow, DC block, fades, etc.
+2. **`lib/dsp/finish.ts`** — Finishing rack applied to every output: trim silence, DC block, EQ profiles, stereo width, soft clip, peak limiter, normalize, fades, tail extend. Also defines chaos lane mapper and length modes.
+3. **`lib/dsp/tape.ts`** — Tape-style tone/filter/loss from first principles: 6 profiles (subtle→destroyed), DC blocker, head bump, tape loss (speed/age HF rolloff), tone tilt, wow/flutter, soft saturation.
+4. **`lib/dsp/delay.ts`** — 5 delay types: mono, ping-pong, diffusion/allpass, reverse, multi-tap — all with filtered feedback, bounded gain, rendered tails.
+5. **`lib/dsp/reverb.ts`** — 5 reverb engines: dark room, modulated hall, dirty metallic, reverse bloom, convolution smear — all with damping, stereo spread, tail rendering.
+6. **`lib/dsp/granular.ts`** — Two-mode granular engine: shard mode (concatenative) and cloud mode (overlap-add with Hann/Tukey envelopes). Includes freeze texture, reverb bloom, delay swarm.
+7. **`lib/dsp/presets.ts`** — 8 preset recipes that chain mutation → tape → delay/reverb → finishing rack, each returning `GeneratedSample[]` with category metadata.
+8. **`lib/dsp/packWorker.ts`** — Web Worker entry: receives decoded audio → runs a preset → encodes WAVs → builds ZIP → posts Blob back.
+9. **`lib/dsp/wav.ts`** — WAV encoding (source sample rate, 16-bit, interleaved).
+10. **`lib/dsp/zip.ts`** — ZIP builder (stored entries, no compression).
 
 The UI (`app/page.tsx`) decodes uploaded audio via `AudioContext.decodeAudioData()`, passes `Float32Array` buffers to the worker, and renders progress/status from worker messages.
 
@@ -44,9 +49,12 @@ The UI (`app/page.tsx`) decodes uploaded audio via `AudioContext.decodeAudioData
 
 - **Float32Array only** — never allocate Float64 for audio data. All transforms return `Float32Array[]`.
 - **No WebAudio nodes** — all DSP is raw array math in the worker. No `AudioContext` processing, no `AudioNode` connections.
-- **validateOutput + ensureSanitary** — every sample goes through RMS validation (rejects silence/NaN) and peak normalization (–1 dBFS headroom)
-- **Progress reporting** — for recipes with multiple sub-recipes, call `onProgress?.(value, message)` between them so the UI stays responsive
-- **Deterministic RNG** — use `seededRng(hashCode(stem) + ...)` for repeatable grain ordering
+- **validateOutput + ensureSanitary** — the `makeSample()` helper handles stereo conversion, RMS validation (rejects silence/NaN), and peak normalization automatically.
+- **Finishing rack** — every output passes through `finishSample()` (DC block, fades, normalize, optional limiting). Do not skip this stage.
+- **Tape + space** — wire tape emulation (`applyTape()`) and reverb/delay between mutation and finishing.
+- **Chaos lanes** — map chaos into 8 lanes per preset using `mapChaosToLanes()`. Define your lane weights in `CHAOS_MAPS`.
+- **Progress reporting** — for recipes with multiple sub-recipes, call `onProgress?.(value, message)` between them so the UI stays responsive.
+- **Deterministic RNG** — use `seededRng(hashCode(stem) + ...)` for repeatable grain ordering.
 
 ---
 
@@ -73,8 +81,18 @@ Transforms at 30,000 ft:
 | Spatial   | `stereoWiden`, `haasEffect`                                                                                 |
 | Granular  | `sliceAudio`, `fadeIn`, `fadeOut`, `applyFades`                                                             |
 | Loop      | `findLoopCandidates`, `analyzeWindow`, `scoreLoopCandidate`, `extractLoopWithCrossfade`, `repeatToDuration` |
-| Character | `finalWarm` (HP20 + LP60 + soft clip), `haasEffect`                                                         |
-| Utility   | `interleave`, `capDuration`, `makeAudioData`, `validateOutput`                                              |
+| Character | `finalWarm` (HP20 + LP60 + soft clip), `haasEffect`, `ensureSanitary`                                       |
+| Utility   | `interleave`, `capDuration`, `validateOutput`, `tremolo`                                                    |
+
+### Higher-level DSP modules
+
+| Module        | File             | Key exports                                                                                         |
+| ------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
+| Finishing     | `finish.ts`      | `finishSample()`, `trimSilence()`, `extendTail()`, `applyLimiter()`, `mapChaosToLanes()`           |
+| Tape          | `tape.ts`        | `applyTape()`, `applyTapeLoss()`, `applyHeadBump()`, `applyTilt()` — 6 profiles                     |
+| Delay         | `delay.ts`       | `monoDelay()`, `pingPongDelay()`, `diffusionDelay()`, `reverseDelay()`, `multiTapDelay()`          |
+| Reverb        | `reverb.ts`      | `darkRoom()`, `modulatedHall()`, `dirtyMetallic()`, `reverseBloom()`, `convolutionSmear()`         |
+| Granular      | `granular.ts`    | `granularCloud()`, `frozenTexture()`, `grainReverbBloom()`, `granularDelaySwarm()`                 |
 
 ---
 

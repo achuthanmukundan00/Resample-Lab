@@ -73,7 +73,7 @@ npx wrangler pages deploy out --branch main
 npx tsx apps/web/lib/dsp/__tests__/dsp.test.ts
 ```
 
-114+ DSP tests: transforms, finishing rack, tape, delays, reverbs, granular engine, stereo/mono compatibility, audio analysis.
+114 DSP tests: transforms, finishing rack, tape, delays, reverbs, granular engine, stereo/mono compatibility.
 
 ### Render audit (listen-test across all presets)
 
@@ -97,9 +97,8 @@ npx playwright install
 # Terminal 1: start dev server
 pnpm dev
 
-# Terminal 2: smoke test or record
-node scripts/demo-recorder.mjs          # quick smoke test
-node scripts/demo-recorder.mjs --record  # record demo.webm
+# Terminal 2: record the demo
+node scripts/demo-recorder.mjs          # records demo.webm to docs/assets/
 ```
 
 Requires `test.wav` at the repo root. The recorded video saves to `docs/assets/demo.webm`.
@@ -157,7 +156,7 @@ Requires `test.wav` at the repo root. The recorded video saves to `docs/assets/d
 | **Long**    | 90s          | Extended pads, ambient tails          |
 | **Absurd**  | 120s         | Maximal drones, large file sizes      |
 
-> Each preset has a default mode tuned to its character. Override it in the UI.
+> Each preset has a default mode tuned to its character. Absurd ambient stretches, short one-shots, medium loops.
 > **Absurd mode** can produce files over 20 MB each and large ZIP downloads.
 
 ---
@@ -166,18 +165,31 @@ Requires `test.wav` at the repo root. The recorded video saves to `docs/assets/d
 
 <sub>All processing runs in a Web Worker — raw `Float32Array` buffers, no AudioContext nodes, no WASM.</sub>
 
-| Technique             | Implementation                                                |
-| :-------------------- | :------------------------------------------------------------ |
-| WSOLA Time‑Stretch    | Overlap-add with Hann windowing, adaptive hop sizes           |
-| Biquad Filters        | Direct-form II transposed — LP/HP/BP with configurable Q      |
-| Schroeder Reverb      | 4 comb filters (31/37/43/53ms) + 2 all-pass sections          |
-| Convolution Reverb    | O(n·k) with exponential-decay noise IR                        |
-| Granular Synthesis    | 4 window sizes (40–200ms), LCG shuffle, per-grain pitch shift |
-| Tape Wow/Flutter      | Multi‑harmonic LFO → fractional delay line                    |
-| Downsample + Bitcrush | Pre‑filter → zero-order-hold → N‑bit quantization             |
-| Haas Effect           | Per‑channel delay (1–12ms) stereo widening                    |
-| Warm Chain            | HP20 → LP60 → soft clip (tanh) → normalize (−1dBFS)           |
-| Loop Detection        | Sliding-window energy analysis, boundary correlation scoring  |
+### Pipeline
+
+```
+source audio → mutation → tape/tone → delay/reverb → finishing rack → output
+                  ↑            ↑            ↑               ↑
+             Chaos lanes:  degradation   space         finish
+             mutation      modulation    stereo        tail
+```
+
+Every preset output flows through this 5-stage pipeline. Chaos maps into 8
+per-preset lanes that control how aggressively each stage operates.
+
+| Technique             | Implementation                                                                     |
+| :-------------------- | :--------------------------------------------------------------------------------- |
+| WSOLA Time‑Stretch    | Overlap-add with Hann windowing, adaptive hop sizes                                |
+| Biquad Filters        | Direct-form II transposed — LP/HP/BP with configurable Q                           |
+| Finishing Rack        | Trim silence → DC block → EQ profile → stereo width → soft clip → limiter → fades  |
+| Tape Emulation        | 6 profiles (subtle→destroyed): DC block, head bump, tape loss, tone tilt, wow      |
+| Modulated Reverbs     | 5 engines: dark room, modulated hall, metallic, reverse bloom, convolution smear   |
+| Delay Effects         | 5 types: mono, ping-pong, diffusion/allpass, reverse, multi-tap — all with tails   |
+| Granular Cloud        | Overlap-add with Hann/Tukey envelopes, pan/pitch/reverse per grain                 |
+| Granular Shards       | 4 window sizes (40–200ms), LCG shuffle, per-grain processing                       |
+| Downsample + Bitcrush | Pre‑filter → zero-order-hold → N‑bit quantization                                  |
+| Haas Effect           | Per‑channel delay (1–12ms) stereo widening                                         |
+| Loop Detection        | Sliding-window energy analysis, boundary correlation scoring                       |
 
 ---
 
@@ -191,14 +203,13 @@ Resample-Lab/
 │   │   └── docs/page.tsx      # Full docs
 │   ├── components/            # React components (ChaosSlider, LengthModeSelector, etc.)
 │   ├── lib/dsp/               # Core DSP engine
-│   │   ├── transforms.ts      # 35+ audio transforms
+│   │   ├── transforms.ts      # 40+ audio transforms
 │   │   ├── presets.ts         # 8 preset recipes
 │   │   ├── finish.ts          # Finishing rack (DC block, EQ, limiter)
 │   │   ├── tape.ts            # Tape emulation (wow, loss, head bump)
 │   │   ├── delay.ts           # Delay effects (mono, ping-pong, diffusion)
 │   │   ├── reverb.ts          # Reverb engines (dark, hall, metallic)
 │   │   ├── granular.ts        # Granular synthesis (cloud, freeze, swarm)
-│   │   ├── analysis.ts        # Audio analysis utilities (peak, RMS, clipping)
 │   │   ├── packWorker.ts      # Web Worker entry
 │   │   ├── wav.ts             # WAV encoding
 │   │   ├── zip.ts             # ZIP builder
@@ -237,7 +248,7 @@ Resample-Lab/
 | Input formats       | WAV, AIFF, FLAC, MP3, M4A, OGG                |
 | Output format       | 16‑bit WAV at source sample rate              |
 | Processing          | Single Web Worker, sync Float32Array          |
-| Tests               | 114+ (npx tsx apps/web/lib/dsp/__tests__/dsp.test.ts) |
+| Tests               | 114 (npx tsx apps/web/lib/dsp/__tests__/dsp.test.ts) |
 
 ---
 

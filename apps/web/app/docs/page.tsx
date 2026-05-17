@@ -111,6 +111,14 @@ export default function DocsPage() {
               <h2 className="text-2xl font-semibold text-foreground mb-4">
                 Preset Reference
               </h2>
+              <p className="text-sm text-zinc-400 mb-6">
+                Every preset follows the same architecture:{" "}
+                <strong>source → mutation → tape/tone → delay/reverb →
+                finishing rack → output</strong>. Chaos maps into 8 lanes per
+                preset (mutation, degradation, space, modulation, instability,
+                finish, stereo, tail), so each preset responds differently to
+                the same chaos value.
+              </p>
 
               <div className="space-y-10">
                 {/* Ambient Stretch Lab */}
@@ -119,15 +127,14 @@ export default function DocsPage() {
                     Ambient Stretch Lab
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    5 outputs
+                    5 outputs · tape: cinematic_dark · length: absurd (120s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
                       WSOLA time-stretch from 8× (clean) to 20× (illegal
-                      texture), followed by layered processing chains. The
-                      source audio is capped at 60 seconds to keep the stretch
-                      buffers manageable, and each output is capped at 90
-                      seconds.
+                      texture), followed by tape warmth, modulated hall reverb,
+                      and finishing rack. Chaos prioritizes space, tail,
+                      modulation, and stereo width — not degradation.
                     </p>
                     <table className="w-full text-xs mt-3">
                       <thead>
@@ -140,49 +147,52 @@ export default function DocsPage() {
                       <tbody className="text-zinc-400">
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            stretched_bed
+                            cathedral_bed
                           </td>
                           <td className="py-2 pr-4">
-                            WSOLA → reverb → tape wow → lowpass → Haas → warm
+                            WSOLA → tape(warm) → modulatedHall → finish(gentle)
                           </td>
-                          <td className="py-2">Wide, dark, evolving pad</td>
+                          <td className="py-2">Lush, cinematic, warm drone</td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            reverse_smear
+                            toxic_air
                           </td>
                           <td className="py-2 pr-4">
-                            Slow resample → reverse → delay → reverb → lowpass →
-                            warm
+                            Resample → reverse → diffusionDelay → darkRoom →
+                            tape(warm) → finish(gentle)
                           </td>
-                          <td className="py-2">Backwards wash, textural</td>
-                        </tr>
-                        <tr className="border-b border-zinc-900">
-                          <td className="py-2 pr-4 text-zinc-300">ghost_pad</td>
-                          <td className="py-2 pr-4">
-                            Lowpass → reverb → soft clip → tape wow → stereo
-                            widen → Haas → warm
-                          </td>
-                          <td className="py-2">Saturated, wide, ethereal</td>
+                          <td className="py-2">Smeared reverse wash with diffusion</td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            driven_texture
+                            doom_choir_drift
                           </td>
                           <td className="py-2 pr-4">
-                            WSOLA → delay → soft clip → lowpass → widen → wow →
-                            Haas
+                            Lowpass → tape(cinematic_dark) → convolutionSmear →
+                            finish(warm)
                           </td>
-                          <td className="py-2">Gritty, rhythmic, wide</td>
+                          <td className="py-2">Heavy, dark, convolution-soaked pad</td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            reverb_wash
+                            submerged_pad
                           </td>
                           <td className="py-2 pr-4">
-                            Reverse → reverb → reverse → lowpass → Haas → warm
+                            Lowpass → tape(sub_heavy) → modulatedHall →
+                            finish(gentle)
                           </td>
-                          <td className="py-2">Classic reverse reverb swell</td>
+                          <td className="py-2">Deep, sub-heavy, underwater</td>
+                        </tr>
+                        <tr className="border-b border-zinc-900">
+                          <td className="py-2 pr-4 text-zinc-300">
+                            reverse_bloom_long
+                          </td>
+                          <td className="py-2 pr-4">
+                            Reverse → reverseBloom → tape(warm) →
+                            finish(gentle, long tail)
+                          </td>
+                          <td className="py-2">Swelling reverse bloom with warm tape</td>
                         </tr>
                       </tbody>
                     </table>
@@ -195,13 +205,13 @@ export default function DocsPage() {
                     Ghost Reverse Lab
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    4 outputs
+                    4 outputs · tape: warm · length: long (90s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Focused on reverse-based effects. Every output starts with
-                      the source played backwards, then processed through
-                      combinations of delay, reverb, filtering, and saturation.
+                      Reverse-based effects with reverse delays, diffusion
+                      clouds, dark rooms, and metallic textures. Chaos
+                      prioritizes space, mutation, and tail extension.
                     </p>
                     <table className="w-full text-xs mt-3">
                       <thead>
@@ -214,39 +224,43 @@ export default function DocsPage() {
                       <tbody className="text-zinc-400">
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            reverse_tail
+                            pre_impact_suck
                           </td>
                           <td className="py-2 pr-4">
-                            Reverse → delay → reverb → warm
+                            Reverse → reverseDelay → darkRoom → tape(warm) →
+                            finish(gentle)
                           </td>
-                          <td className="py-2">Decaying reverse echo tail</td>
-                        </tr>
-                        <tr className="border-b border-zinc-900">
-                          <td className="py-2 pr-4 text-zinc-300">ghost_hit</td>
-                          <td className="py-2 pr-4">
-                            Slow resample → reverse → bandpass → reverb → soft
-                            clip → Haas → warm
-                          </td>
-                          <td className="py-2">Filtered, reverbed, wide</td>
+                          <td className="py-2">Short reverse pre-impact with suck</td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            filtered_pre
+                            ghost_swell_long
                           </td>
                           <td className="py-2 pr-4">
-                            Reverse → highpass → reverb → tape wow → Haas → warm
+                            Resample → reverse → darkRoom → tape(warm) →
+                            finish(gentle, long fade)
                           </td>
-                          <td className="py-2">Airy, shimmering pre-echo</td>
+                          <td className="py-2">Long swelling ghost reverse</td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            distorted_pre
+                            reverse_delay_cloud
                           </td>
                           <td className="py-2 pr-4">
-                            Reverse → soft clip → delay → reverb → lowpass →
-                            Haas
+                            Reverse → diffusionDelay → convolutionSmear →
+                            tape(subtle) → finish(gentle)
                           </td>
-                          <td className="py-2">Aggressive, wide pre-impact</td>
+                          <td className="py-2">Diffused reverse delay into cloud</td>
+                        </tr>
+                        <tr className="border-b border-zinc-900">
+                          <td className="py-2 pr-4 text-zinc-300">
+                            haunted_room_tail
+                          </td>
+                          <td className="py-2 pr-4">
+                            Reverse → dirtyMetallic → tape(degraded) →
+                            finish(gentle)
+                          </td>
+                          <td className="py-2">Haunted metallic reverse decay</td>
                         </tr>
                       </tbody>
                     </table>
@@ -259,25 +273,33 @@ export default function DocsPage() {
                     Granular Shards
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    10 outputs
+                    10 outputs · tape: subtle · length: medium (45s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Slices audio at four window sizes (40ms, 80ms, 120ms,
-                      200ms) into a pooled grain buffer, shuffles with a seeded
-                      LCG PRNG, then builds sequences with per-grain processing.
-                      The seed is derived from the source filename + chaos
-                      value, so the same input always produces the same grain
-                      order.
+                      <strong>Two engine modes:</strong> Concatenative shards
+                      (slices audio at 4 window sizes: 40–200ms, shuffles with
+                      seeded LCG PRNG, per-grain processing) and{" "}
+                      <strong>cloud mode</strong> (overlap-add with Hann/Tukey
+                      envelopes, random pan, pitch distribution, reverse
+                      probability, density/jitter control). Chaos prioritizes
+                      mutation, pan spread, and instability.
                     </p>
-                    <ul className="space-y-1 mt-3 text-zinc-400">
+                    <p className="text-xs text-accent mt-2">
+                      — Shard mode —
+                    </p>
+                    <ul className="space-y-1 mt-1 text-zinc-400">
                       <li>
-                        <span className="text-zinc-300">micro_chop</span> —
-                        Clean shuffled grains with 3ms fades
+                        <span className="text-zinc-300">stereo_shrapnel_loop</span>{" "}
+                        — Wide stereo micro-chop with fades
                       </li>
                       <li>
                         <span className="text-zinc-300">crushed_shards</span> —
                         2–8 bit quantization per grain
+                      </li>
+                      <li>
+                        <span className="text-zinc-300">glitch_bits</span> —
+                        Saturated (tanh) grains
                       </li>
                       <li>
                         <span className="text-zinc-300">pitch_cloud</span> —
@@ -285,25 +307,36 @@ export default function DocsPage() {
                       </li>
                       <li>
                         <span className="text-zinc-300">verb_throws</span> —
-                        Reverb-tail grains
-                      </li>
-                      <li>
-                        <span className="text-zinc-300">glitch_bits</span> —
-                        Saturated (tanh) grains
+                        Dark room reverb on each grain
                       </li>
                       <li>
                         <span className="text-zinc-300">stutter_bits</span> —
-                        Loop-based stutter repeats with tape wow
+                        Loop-based stutter repeats with tape
+                      </li>
+                    </ul>
+                    <p className="text-xs text-accent mt-2">
+                      — Cloud mode —
+                    </p>
+                    <ul className="space-y-1 mt-1 text-zinc-400">
+                      <li>
+                        <span className="text-zinc-300">particle_cloud</span> —
+                        Overlap-add grains, pitch spread, pan drift
                       </li>
                       <li>
-                        <span className="text-zinc-300">noisy_shards_1/2</span>{" "}
-                        — Noise-layered and filtered noise grains
+                        <span className="text-zinc-300">frozen_texture</span> —
+                        Sustained drone from short freeze region
                       </li>
                       <li>
                         <span className="text-zinc-300">
-                          speed_fast/slow_grains
+                          granular_delay_swarm
                         </span>{" "}
-                        — 0.3–3× resample per grain
+                        — Grains fed into delay feedback network
+                      </li>
+                      <li>
+                        <span className="text-zinc-300">
+                          grain_reverb_bloom
+                        </span>{" "}
+                        — Grains with exponential decay wash
                       </li>
                     </ul>
                   </div>
@@ -315,13 +348,14 @@ export default function DocsPage() {
                     Bitrot Dirt
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    4 outputs
+                    4 outputs · tape: degraded · length: medium (45s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Degradation-focused preset applying combinations of
-                      downsampling (2–14×), bitcrushing (2–8 bit), noise
-                      injection, tape wow, and bandpass filtering.
+                      Musical degradation — not just digital fracture. Tape
+                      loss (speed/age-dependent HF rolloff), cassette flutter,
+                      metallic reverb, and convolution smear. Chaos strongly
+                      prioritizes degradation, instability, and modulation.
                     </p>
                     <table className="w-full text-xs mt-3">
                       <thead>
@@ -332,37 +366,39 @@ export default function DocsPage() {
                       </thead>
                       <tbody className="text-zinc-400">
                         <tr className="border-b border-zinc-900">
-                          <td className="py-2 pr-4 text-zinc-300">crushed</td>
+                          <td className="py-2 pr-4 text-zinc-300">
+                            rotted_room_loop
+                          </td>
                           <td className="py-2 pr-4">
-                            Downsample (4–14×) → bitcrush (2–8 bit) → noise →
-                            bandpass → soft clip
+                            Downsample → bitcrush → tape(degraded) → darkRoom →
+                            finish
                           </td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            degraded_wow
+                            cassette_collapse
                           </td>
                           <td className="py-2 pr-4">
-                            Downsample → tape wow → soft clip → lowpass → noise
-                            → Haas
+                            Downsample → tape(destroyed) → dirtyMetallic →
+                            finish(degraded)
                           </td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            broken_loop
+                            speaker_cone_tear
                           </td>
                           <td className="py-2 pr-4">
-                            Loop finder → extract → repeat → downsample →
-                            bitcrush → noise → wow → soft clip → lowpass → Haas
+                            Soft clip → bandpass → noise → dirtyMetallic →
+                            finish(limited)
                           </td>
                         </tr>
                         <tr className="border-b border-zinc-900">
                           <td className="py-2 pr-4 text-zinc-300">
-                            noise_artifact
+                            bitcrushed_tail
                           </td>
                           <td className="py-2 pr-4">
-                            Soft clip → bandpass → noise → DC block → tape wow →
-                            hard clamp
+                            Bitcrush → downsample → convolutionSmear →
+                            tape(degraded) → finish
                           </td>
                         </tr>
                       </tbody>
@@ -376,31 +412,32 @@ export default function DocsPage() {
                     Pitch Wreckage
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    4 outputs
+                    4 outputs · tape: degraded · length: medium (45s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Aggressive pitch manipulation via linear resampling
-                      (preserves the pitch-shifted artifacts of sample-rate
-                      conversion). Octave shifts are ±12–24 semitones.
+                      Pitch mutation via linear resampling with tape processing
+                      and convolution wash. Octave shifts are ±12–24 semitones.
+                      Chaos controls mutation intensity and instability.
                     </p>
                     <ul className="space-y-1 mt-3 text-zinc-400">
                       <li>
-                        <span className="text-zinc-300">octave_down</span> — –12
-                        to –24 st with saturation + lowpass
+                        <span className="text-zinc-300">sub_beast_layer</span> —
+                        –12 to –24 st → tape(sub_heavy) → convolutionSmear →
+                        finish(limited)
                       </li>
                       <li>
-                        <span className="text-zinc-300">octave_up</span> — +12
-                        to +24 st with bandpass + reverb
+                        <span className="text-zinc-300">glass_octave_tail</span>{" "}
+                        — +12 to +24 st → bandpass → darkRoom → finish(bright)
                       </li>
                       <li>
-                        <span className="text-zinc-300">pitch_drift</span> —
-                        Multi-LFO + noise-modulated time-varying resample (±3–13
-                        st), reverb, Haas
+                        <span className="text-zinc-300">detuned_metal_pair</span>{" "}
+                        — Dual ±18 st layers → dirtyMetallic → tape(degraded)
                       </li>
                       <li>
-                        <span className="text-zinc-300">dual_pitch</span> — ±18
-                        st layers mixed 50/50 with distortion + delay
+                        <span className="text-zinc-300">falling_pitch_smear</span>{" "}
+                        — Resample down → tape(cinematic_dark) →
+                        convolutionSmear → finish(warm)
                       </li>
                     </ul>
                   </div>
@@ -412,34 +449,35 @@ export default function DocsPage() {
                     Loop Extractor
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    4 outputs
+                    5 outputs · tape: subtle · length: medium (45s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Uses heuristic energy analysis to find loop-worthy
-                      sections in the source audio. The candidate finder slides
-                      a window across the waveform, scoring each position on
-                      RMS, boundary correlation, transient content, and tail
-                      energy. The top non-overlapping candidates are extracted
-                      and crossfaded.
+                      Heuristic energy analysis finds loop-worthy sections.
+                      Sliding-window RMS, boundary correlation, transient
+                      scoring, and crossfade smoothing. Each candidate gets
+                      multiple finishing treatments.
                     </p>
                     <ul className="space-y-1 mt-3 text-zinc-400">
                       <li>
                         <span className="text-zinc-300">clean_loop</span> —
-                        Crossfaded loop with Haas + warm chain
+                        Crossfaded loop, finish(gentle)
                       </li>
                       <li>
-                        <span className="text-zinc-300">degraded_loop</span> —
-                        Pre-normalized then crushed, bitcrushed, noise-layered,
-                        widened
+                        <span className="text-zinc-300">dirty_room_loop</span> —
+                        Tape(subtle) → darkRoom → finish(warm)
                       </li>
                       <li>
-                        <span className="text-zinc-300">ghost_loop</span> —
-                        Reverb + lowpass + stereo widen + Haas + warm
+                        <span className="text-zinc-300">delayed_loop</span> —
+                        Ping-pong delay with filtered feedback
                       </li>
                       <li>
-                        <span className="text-zinc-300">driven_loop</span> —
-                        Saturation + delay + bandpass + DC block + Haas
+                        <span className="text-zinc-300">ambient_loop</span> —
+                        Modulated hall → tape(warm) → finish(warm)
+                      </li>
+                      <li>
+                        <span className="text-zinc-300">one_shot_from_loop</span>{" "}
+                        — Extracted one-shot with convolution tail
                       </li>
                     </ul>
                   </div>
@@ -451,35 +489,39 @@ export default function DocsPage() {
                     Impact / Riser Mutator
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    4 outputs
+                    5 outputs · tape: cinematic_dark · length: long (90s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      Transient manipulation and riser construction. The
-                      convolution-based transient smear is the heaviest DSP
-                      operation — input is capped at 5 seconds to maintain
-                      reasonable performance.
+                      Cinematic impact design. Filter sweeps, convolution
+                      reverb, reverse blooms, metallic hits, and sub-heavy
+                      collapses. Chaos amplifies tail length, space, and
+                      mutation. All outputs are peak-limited for safety.
                     </p>
                     <ul className="space-y-1 mt-3 text-zinc-400">
                       <li>
-                        <span className="text-zinc-300">riser</span> — Reverse →
-                        fade in → soft clip → reverb → filter sweep (200 Hz → 8
-                        kHz) → Haas → warm
+                        <span className="text-zinc-300">doom_riser</span> —
+                        Reverse → filterSweep → tape(cinematic_dark) →
+                        modulatedHall → finish(warm)
                       </li>
                       <li>
-                        <span className="text-zinc-300">impact</span> — Resample
-                        –24 to –36 st → soft clip → highpass 40 Hz → reverb →
-                        warm
+                        <span className="text-zinc-300">pressure_drop</span> —
+                        –24 to –36 st → tape(sub_heavy) → convolutionSmear →
+                        finish(limited)
                       </li>
                       <li>
-                        <span className="text-zinc-300">smear</span> —
-                        Convolution reverb (exponential-noise IR, wet/dry mix,
-                        0.5–3 s reverb time)
+                        <span className="text-zinc-300">metal_impact</span> —
+                        Reverse → dirtyMetallic → tape(degraded) →
+                        finish(gentle)
                       </li>
                       <li>
-                        <span className="text-zinc-300">filter_riser</span> —
-                        Reverse → filter sweep (50 Hz → 4–12 kHz) → soft clip →
-                        delay → Haas → warm
+                        <span className="text-zinc-300">reverse_slam</span> —
+                        Soft clip → reverseBloom → finish(limited)
+                      </li>
+                      <li>
+                        <span className="text-zinc-300">sub_collapse</span> —
+                        –30 st → tape(sub_heavy) → convolutionSmear (damped) →
+                        finish(warm, long tail)
                       </li>
                     </ul>
                   </div>
@@ -491,22 +533,22 @@ export default function DocsPage() {
                     Chaos Pack
                   </h3>
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
-                    7 outputs
+                    7 outputs · tape: warm · length: long (90s)
                   </span>
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      A curated multi-preset mashup. Runs 7 sub-recipes with
-                      adjusted chaos levels and picks the most interesting
-                      output from each. Maximum entropy in a single download.
+                      Curated multi-preset mashup. Runs 7 sub-recipes with
+                      adjusted chaos, picking the most interesting output from
+                      each. Seven flavors of controlled entropy.
                     </p>
                     <ol className="list-decimal list-inside space-y-1 mt-3 text-sm text-zinc-400">
-                      <li>Ghost pad from Ambient Stretch</li>
-                      <li>Ghost hit from Ghost Reverse</li>
-                      <li>Micro chop from Granular Shards</li>
-                      <li>Pitch cloud from Granular Shards</li>
-                      <li>Degraded loop from Loop Extractor</li>
-                      <li>Riser from Impact / Riser Mutator</li>
-                      <li>Octave-down oddity from Pitch Wreckage</li>
+                      <li>cathedral_bed from Ambient Stretch</li>
+                      <li>haunted_room_tail from Ghost Reverse</li>
+                      <li>particle_cloud from Granular Shards</li>
+                      <li>granular_delay_swarm from Granular Shards</li>
+                      <li>dirty_room_loop from Loop Extractor</li>
+                      <li>doom_riser from Impact/Riser</li>
+                      <li>sub_beast_layer from Pitch Wreckage</li>
                     </ol>
                   </div>
                 </div>
@@ -662,23 +704,130 @@ export default function DocsPage() {
                 DSP Techniques
               </h2>
               <p className="mb-6">
-                Every transform is implemented in pure JavaScript/TypeScript
-                using Float32Array buffers. No WebAudio nodes, no WASM, no
-                external DSP libraries.
+                Every transform is implemented in pure TypeScript using{" "}
+                Float32Array buffers. No WebAudio nodes, no WASM, no external
+                DSP libraries. Deterministic, browser-safe, reviewable.
               </p>
 
               <div className="space-y-6">
                 <div>
                   <h3 className="text-base font-medium text-foreground mb-1">
+                    Processing Pipeline
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    Every preset output flows through a consistent architecture:
+                  </p>
+                  <div className="bg-zinc-900 rounded-lg p-3 mt-2">
+                    <pre className="text-xs text-zinc-400 overflow-x-auto">
+                      <code>{`source → mutation → tape/tone → delay/reverb → finishing rack → output
+
+1. Mutation    — WSOLA stretch, resample, reverse, bitcrush, etc.
+2. Tape/Tone   — DC block, head bump, tape loss (speed/age HF rolloff),
+                 tone tilt, wow/flutter, soft saturation
+3. Delay/Reverb — Dark room, modulated hall, dirty metallic,
+                 reverse bloom, convolution smear, ping-pong delay,
+                 diffusion delay, reverse delay, multi-tap
+4. Finishing   — Trim silence, DC block, EQ profile, stereo width,
+                 soft clip, peak limiter, normalize, fades, tail extend`}</code>
+                    </pre>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Finishing Rack
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    Shared post-processing applied to every output. Order:
+                    trim silence → DC block → EQ profile (gentle/warm/bright/
+                    degraded) → stereo width → soft clip → peak limiter →
+                    normalize to –1 dBFS → fades (5ms in, 20ms out) → tail
+                    extend. The limiter uses tanh-based soft-knee saturation
+                    above 85% of ceiling.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Tape Emulation
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    Implemented from first principles — no GPL code, no{" "}
+                    CHOWTapeModel port. 6 profiles: subtle, warm, degraded,
+                    destroyed, cinematic_dark, sub_heavy. Each profile includes
+                    DC blocker (single-pole IIR, R≈0.997), input highpass/
+                    lowpass, head bump (peaking EQ at 45–120 Hz with
+                    configurable Q), tape loss (speed/age-dependent HF rolloff
+                    via first-order lowpass), tone tilt (dark/neutral/bright/
+                    sub_heavy), optional wow/flutter (delegates to sinusoidal
+                    fractional delay modulation), and optional soft saturation.
+                    Chaos pushes parameters toward more degradation: lower
+                    speed, older age, deeper wow, more drive.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Delay Architecture
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    5 delay types, all with bounded feedback (≤0.95) and full
+                    tail rendering. Mono delay with optional LPF/HPF in the
+                    feedback path. Stereo ping-pong with cross-channel feedback.
+                    Diffusion delay with cascaded allpass smearing (2–6 stages).
+                    Reverse delay that reads the buffer backwards for pre-echo
+                    effects. Multi-tap delay with per-tap gain and stereo pan.
+                    All delays normalize to 0.95 peak and guarantee finite output.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Reverb Architecture
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    5 reverb engines with damping, stereo spread, and rendered
+                    tails. Dark room: 4-comb + 2-allpass FDN with heavy LPF
+                    damping. Modulated hall: sinusoidal delay-read modulation
+                    for cloud/bloom effects, extended tail. Dirty metallic: 6
+                    shorter combs with configurable brightness for ringy
+                    textures. Reverse bloom: input reversed → FDN → reversed
+                    back for swelling pre-effects. Convolution smear: O(n·k)
+                    with procedurally generated exponential-decay noise IR
+                    (LPF-damped). All reverbs guarantee peak ≤1.0 and finite
+                    output.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Granular Synthesis (Two Modes)
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    <strong>Shard mode:</strong> Slices at 4 window sizes
+                    (40–200ms), shuffles with seeded LCG PRNG, concatenates
+                    with per-grain processing (pitch shift, bitcrush, reverb,
+                    saturation).{" "}
+                    <strong>Cloud mode:</strong> Overlap-add with Hann/Tukey
+                    envelopes, random grain position, pitch (±semitone range),
+                    pan per grain, reverse probability, density (grains/sec),
+                    jitter. Freeze mode sustains a short window via dense
+                    overlapping grains. Delay swarm feeds grains into a
+                    feedback delay network. Reverb bloom applies exponential
+                    decay envelopes for grain-to-wash transitions. All modes
+                    are deterministic for a given seed.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
                     WSOLA Time-Stretch
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Waveform-Similarity Overlap-Add. Splits the signal into 30
-                    ms frames with a Hann window, overlaps them at a hop ratio
-                    derived from the stretch factor, and re-granulates. At
-                    extreme ratios (20×+), falls back to simple resample to
-                    avoid absurd intermediate buffers. Source audio is capped at
-                    60 s before stretching.
+                    Waveform-Similarity Overlap-Add. 30ms frames with Hann
+                    window, hop ratio from stretch factor. Falls back to simple
+                    resample at extreme ratios (20×+). Source capped at 60s
+                    before stretching.
                   </p>
                 </div>
 
@@ -687,12 +836,9 @@ export default function DocsPage() {
                     Biquad Filters
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Direct Form II transposed implementation of lowpass,
-                    highpass, and bandpass filters. Cutoff frequency is clamped
-                    to [20 Hz, Nyquist – 1 Hz]. Q factor is fixed at 0.707
-                    (Butterworth) for lowpass/highpass; bandpass Q is derived
-                    from the bandwidth ratio. Coefficients are pre-computed in
-                    the constructor and the filter state is per-instance.
+                    Direct Form II transposed. LP/HP at Q=0.707 (Butterworth);
+                    bandpass Q from bandwidth ratio. Cutoff clamped to [20Hz,
+                    Nyquist–1Hz]. Coefficients pre-computed, state per-instance.
                   </p>
                 </div>
 
@@ -701,12 +847,10 @@ export default function DocsPage() {
                     Schroeder Reverb
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Classic algorithmic reverb: 4 parallel comb filters at
-                    staggered delays (31, 37, 43, 53 ms) with feedback gain set
-                    by the decay parameter, followed by a cascaded all-pass
-                    section at 5 ms to dense the response. Output is wet-only
-                    (the caller mixes with dry if needed) and normalized to peak
-                    1.0.
+                    Classic 4-comb (31/37/43/53ms) + cascaded allpass (5ms).
+                    Feedback gain set by decay. Output normalized to peak 1.0.
+                    Used as a lightweight option where more expensive reverbs
+                    aren&apos;t needed.
                   </p>
                 </div>
 
@@ -715,44 +859,10 @@ export default function DocsPage() {
                     Convolution Reverb
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    O(n·k) direct convolution between the audio signal and an
-                    exponential-decay noise impulse response. The IR is
-                    generated procedurally: white noise multiplied by an
-                    exponential envelope, scaled to 0.3 peak. Input is capped at
-                    5 seconds (~240k samples) and the IR is capped at 3 seconds
-                    (~144k samples) to bound the worst-case operation count.
-                    Used exclusively in the transient smear effect.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-medium text-foreground mb-1">
-                    Granular Synthesis
-                  </h3>
-                  <p className="text-sm text-zinc-400">
-                    The source is sliced at 4 window sizes (40, 80, 120, 200 ms)
-                    into overlapping grain pools. Grains are shuffled using a
-                    Linear Congruential Generator seeded from the source
-                    filename + chaos for deterministic output. Sequences are
-                    built by selecting N grains from the pool, applying
-                    per-grain processing (pitch shift, bitcrush, reverb,
-                    saturation, resample), then concatenating with small fades
-                    at boundaries to avoid clicks.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-medium text-foreground mb-1">
-                    Haas Effect
-                  </h3>
-                  <p className="text-sm text-zinc-400">
-                    Each channel receives a random delay between 1 and 12 ms
-                    (configurable), creating a precedence-effect stereo
-                    widening. The delays are randomized per-call, so every
-                    sample gets a unique stereo offset. Combined with the warm
-                    chain (HP20 + LP60 + soft clip), this produces the signature
-                    watchyourtemper® character applied to ambient, ghost, and
-                    riser outputs.
+                    O(n·k) direct convolution with exponential-decay noise IR.
+                    IR generated procedurally and LPF-damped. Input capped at
+                    5s, IR typically 0.5–4s. Used for transient smear and
+                    cinematic wash effects.
                   </p>
                 </div>
 
@@ -761,14 +871,30 @@ export default function DocsPage() {
                     Loop Detection
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    The heuristic loop finder slides a window (adaptive step:
-                    0.25 s for short sources, 1.0 s for long) across the
-                    waveform at candidate durations (1, 2, 3, 4, 6, 8 s). Each
-                    window is scored on 6 weighted metrics: RMS energy,
-                    peak-to-RMS ratio, front-loaded energy, tail energy, and
-                    start/end boundary correlation. The top non-overlapping
-                    candidates are selected; if none exceed the threshold, a
-                    fallback middle-section window is used.
+                    Heuristic sliding-window finder with adaptive step size.
+                    Scores on RMS energy, peak-to-RMS ratio, front-loaded
+                    energy, tail energy, and boundary correlation. Top
+                    non-overlapping candidates selected; fallback to middle
+                    section if none pass threshold.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Chaos Lane Mapping
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    The single 0–1 chaos knob maps into 8 per-preset lanes:
+                    mutation, degradation, space, modulation, instability,
+                    finish, stereo, tail. Each preset defines its own lane
+                    weights. Ambient Stretch prioritizes space and tail;
+                    Bitrot Dirt prioritizes degradation and instability;
+                    Impact/Riser prioritizes space, tail, and stereo. Chaos
+                    is applied as{" "}
+                    <code className="text-xs bg-zinc-800 px-1">
+                      chaos × laneWeight
+                    </code>{" "}
+                    for each lane.
                   </p>
                 </div>
 
@@ -777,11 +903,10 @@ export default function DocsPage() {
                     Tape Wow &amp; Flutter
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Modulates a fractional delay line with a sinusoidal LFO. A
-                    single tone at the wow rate creates the pitch wobble; the
-                    depth parameter controls deviation in samples. Linear
-                    interpolation between integer sample positions keeps the
-                    modulation smooth.
+                    Sinusoidal LFO modulating a fractional delay line. Linear
+                    interpolation between samples. Separate from the broader
+                    tape emulation module — this is the raw pitch modulation
+                    primitive.
                   </p>
                 </div>
 
@@ -790,10 +915,21 @@ export default function DocsPage() {
                     Downsample + Bitcrush
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    Two-stage degradation: first a lowpass filter at
-                    Nyquist/downsampleRatio, then zero-order-hold decimation.
-                    Bitcrushing follows by uniform quantization to N bits
-                    (1–16), with N &ge; 16 passing through unchanged.
+                    Two-stage: lowpass at Nyquist/factor → zero-order-hold
+                    decimation, then uniform quantization to N bits (1–16).
+                    N ≥ 16 passes through.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-1">
+                    Haas Effect
+                  </h3>
+                  <p className="text-sm text-zinc-400">
+                    Per-channel random delay (1–12ms) for precedence-effect
+                    stereo widening. Randomized per-call. Combined with warm
+                    chain (HP20 + LP60 + soft clip + normalize) for the
+                    watchyourtemper® character chain.
                   </p>
                 </div>
               </div>
@@ -839,8 +975,10 @@ export default function DocsPage() {
                   <h3 className="text-foreground font-medium mb-2">Codebase</h3>
                   <ul className="space-y-1 text-zinc-400">
                     <li>Framework: Next.js 16 (static export)</li>
-                    <li>DSP: ~2,600 lines of pure TypeScript</li>
-                    <li>35+ transform functions</li>
+                    <li>DSP: ~4,300 lines of pure TypeScript across 8 modules</li>
+                    <li>40+ transform functions</li>
+                    <li>5 new DSP modules: finish, tape, delay, reverb, granular</li>
+                    <li>92 automated DSP tests</li>
                     <li>Zero runtime dependencies for audio</li>
                   </ul>
                 </div>
@@ -874,13 +1012,15 @@ export default function DocsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-foreground mb-1">
-                    Why is the transient smear slow at high chaos?
+                    Why is convolution reverb slow at high chaos?
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    The smear uses direct convolution (O(n·k)), which at worst
-                    case processes ~240k samples against a ~144k-sample IR. On a
-                    modern laptop this takes 2–5 seconds. The input is capped at
-                    5 seconds to prevent browser hangs.
+                    Convolution uses direct O(n·k) convolution. The impulse
+                    response length scales with reverb time (up to 4s at
+                    high chaos = ~192k samples). Input is capped to bound
+                    the operation count. On a modern laptop this typically
+                    takes 2–5 seconds. Consider this a tradeoff for
+                    deterministic, dependency-free convolution.
                   </p>
                 </div>
                 <div>
@@ -898,9 +1038,15 @@ export default function DocsPage() {
                     Why are some outputs skipped?
                   </h3>
                   <p className="text-sm text-zinc-400">
-                    If the processed audio has near-zero RMS or contains NaN
-                    values, it&apos;s skipped to avoid silent or corrupted WAV
-                    files. This can happen with extreme settings on very quiet
+                    Every output passes validation (RMS &ge; 10⁻⁷, length
+                    &ge; 20 samples, no NaN/Infinity) via{" "}
+                    <code className="text-xs bg-zinc-800 px-1 rounded">
+                      validateOutput()
+                    </code>{" "}
+                    before it&apos;s included. If the processed audio is
+                    silent or corrupted, it&apos;s skipped to avoid broken
+                    WAV files. The finishing rack also clamps NaN to 0 and
+                    limits peaks, so skipped outputs are rare with normal
                     source material.
                   </p>
                 </div>
@@ -910,10 +1056,15 @@ export default function DocsPage() {
                   </h3>
                   <p className="text-sm text-zinc-400">
                     A signature processing chain: Haas-effect stereo widening
-                    (random 1–12 ms per-channel delay) followed by a warm chain
-                    (20 Hz highpass → 60 Hz lowpass → soft clip saturation →
-                    normalize). It&apos;s applied to ambient, ghost, and riser
-                    outputs across all presets.
+                    (random 1–12 ms per-channel delay) followed by the finishing
+                    rack (DC block, EQ profile, stereo width, soft clip
+                    saturation, limiter, peak normalize, fades). Every output
+                    passes through the finishing rack. The earlier warm chain
+                    (HP20 → LP60 → soft clip) is still available as{" "}
+                    <code className="text-xs bg-zinc-800 px-1 rounded">
+                      finalWarm()
+                    </code>{" "}
+                    but most presets now use the full finishing rack.
                   </p>
                 </div>
                 <div>
@@ -996,20 +1147,21 @@ export default function DocsPage() {
                   </h3>
                   <div className="bg-zinc-900 rounded-lg p-4 mt-2">
                     <pre className="text-xs text-zinc-400 overflow-x-auto">
-                      <code>
-                        apps/web/ ├── app/ │ ├── page.tsx # Main UI (upload,
-                        presets, chaos, download) │ └── docs/page.tsx # This
-                        documentation page ├── components/ # React components
-                        (UploadDropzone, PresetCard, │ # ChaosSlider,
-                        GenerateButton, PackStatusCard, etc.) ├── lib/dsp/ # DSP
-                        engine │ ├── transforms.ts # 35+ audio transform
-                        functions │ ├── presets.ts # 8 preset recipes │ ├──
-                        packWorker.ts # Web Worker entry point │ ├── wav.ts #
-                        WAV encoding │ ├── zip.ts # ZIP building │ ├──
-                        constants.ts # DSP limits │ └── types.ts # Shared types
-                        ├── public/ # Static assets └── next.config.ts # Static
-                        export config
-                      </code>
+                      <code>{`apps/web/lib/dsp/    # DSP engine
+├── transforms.ts   # 40+ atomic audio transforms
+├── presets.ts      # 8 preset recipes + registry
+├── finish.ts       # Finishing rack (DC block, EQ, limiter, fades)
+├── tape.ts         # Tape emulation (6 profiles, loss, head bump)
+├── delay.ts        # Delay effects (mono, ping-pong, diffusion, reverse)
+├── reverb.ts       # Reverb engines (dark, hall, metallic, bloom, convolution)
+├── granular.ts     # Granular synthesis (cloud, freeze, swarm, bloom)
+├── packWorker.ts   # Web Worker entry point
+├── wav.ts          # 16-bit WAV encoding
+├── zip.ts          # ZIP builder (stored, no compression)
+├── constants.ts    # Centralized limits
+├── types.ts        # Shared types
+└── __tests__/      # 92 DSP tests
+    └── dsp.test.ts`}</code>
                     </pre>
                   </div>
                 </div>
