@@ -4,6 +4,39 @@ Issues, PRs, and forks welcome. Resample-Lab is an experimental DSP sandbox and 
 
 ---
 
+## Where to help
+
+If you're an audio developer and want to dig in, here's where you'll have the most impact.
+
+### DSP paths that need real-world testing
+
+- **WSOLA stretch at extreme ratios** (>16×) — musicality falls apart on transient-heavy material. Test with drums, plucks, full mixes.
+- **Granular shard vs cloud** — the boundary between shard and cloud modes isn't clean on all source material. Edge cases welcome.
+- **Tape wow depth vs chaos** — subtle wow (chaos < 0.3) may be inaudible on bass-heavy sources. Needs ears on it.
+- **Convolution smear reverb** — impulse response is synthetic. Real IR testing would surface issues.
+- **Limiter pumping** — the finishing rack limiter can pump on material with strong sub information. Threshold curves may need tuning.
+
+### Loading performance
+
+- **Worker cold-start time** — the DSP worker loads synchronously on first preset render. Profiling and lazy-init opportunities.
+- **Large file decoding** — 5-minute WAVs decoded on the main thread. Offloading to a second worker or streaming decode would help.
+- **ZIP download size for Absurd mode** — 120s × 8 outputs can exceed 200 MB. Progressive download or user warnings needed.
+
+### Good first issues
+
+| Area | Difficulty | What |
+|---|---|---|
+| Preset metadata | Easy | Improve preset descriptions, add usage tips shown in the UI |
+| Test coverage | Easy | Add edge-case tests: silence input, stereo/mono mismatch, sample rate extremes |
+| Output filename format | Easy | Customizable naming patterns |
+| New preset | Medium | Fork an existing preset recipe, tweak the chain, propose a new one |
+| WAV metadata | Medium | Embed BWF chunk with preset params in output WAVs |
+| Mobile layout | Medium | The UI assumes desktop. Responsive pass needed |
+| Drag-and-drop folders | Medium | Currently single-file upload only |
+| Streaming render | Hard | Render output chunks as they finish rather than all-at-once ZIP |
+
+---
+
 ## Project Overview
 
 The entire DSP pipeline runs client-side in a Web Worker:
