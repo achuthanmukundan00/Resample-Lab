@@ -41,6 +41,26 @@
 
 <br />
 
+
+---
+
+## Who this is for
+
+### Music producers
+
+Resample-Lab turns a single sample into a complete sample pack. Drop in a drum hit, a synth stab, a vocal phrase, or a field recording — the DSP engine generates 8 variants across five categories: ambiences, one-shots, loops, oddities, and granular textures.
+
+- **Sound designers** — stretch, degrade, and smear a source into unrecognizable territory with the chaos knob
+- **Beatmakers** — extract loops, generate risers, build impact one-shots from any transient
+- **Ambient producers** — create 90-second drones from a 2-second piano note
+- **Live performers** — pre-generate texture packs for a set. Everything runs locally, no internet needed
+
+No AI. No cloud uploads. Deterministic DSP — the same source + preset + chaos value always gives the same output.
+
+### Developers
+
+The DSP pipeline is a pure TypeScript signal processing chain running in a Web Worker. See [How it works](#how-it-works) for the architecture. If you want to add a preset, fix a transform, or improve performance, start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ---
 
 ## Quickstart
