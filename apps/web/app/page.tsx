@@ -36,6 +36,7 @@ export default function Home() {
 
   const workerRef = useRef<Worker | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setCapabilities({
@@ -54,6 +55,7 @@ export default function Home() {
     return () => {
       workerRef.current?.terminate();
       audioCtxRef.current?.close();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -116,22 +118,41 @@ export default function Home() {
       );
       workerRef.current = worker;
 
+      worker.onerror = (err: ErrorEvent) => {
+        setError(err.message || "Worker error");
+        setLocalStatus("error");
+        setIsProcessing(false);
+      };
+
       worker.onmessage = (e) => {
         const msg = e.data;
         if (msg.type === "progress") {
           setLocalProgress(msg.value);
           setLocalMessage(msg.message);
         } else if (msg.type === "complete") {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
           setZipBlob(msg.zipBlob);
           setManifest(msg.manifest);
           setLocalStatus("complete");
           setIsProcessing(false);
         } else if (msg.type === "error") {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
           setError(msg.error);
           setLocalStatus("error");
           setIsProcessing(false);
         }
       };
+
+      // Set processing timeout (130 seconds — must exceed worker's 120s)
+      timeoutRef.current = setTimeout(() => {
+        worker.terminate();
+        workerRef.current = null;
+        setError("Processing timed out. Please try again with shorter audio.");
+        setLocalStatus("error");
+        setIsProcessing(false);
+      }, 130_000);
 
       // 4. Start processing
       setLocalMessage("Generating samples…");

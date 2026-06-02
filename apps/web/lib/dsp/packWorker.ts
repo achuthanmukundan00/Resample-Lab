@@ -14,16 +14,26 @@ import { interleave } from "./transforms";
 import { buildZip } from "./zip";
 
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
-  const { files, preset, chaos } = e.data;
-
   if (e.data.type !== "generate") return;
+
+  const { files, preset, chaos } = e.data;
 
   (async () => {
     try {
+      const TIMEOUT_MS = 120_000;
+      const deadline = Date.now() + TIMEOUT_MS;
       const packId = `pack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      /** Check deadline and throw if exceeded. Called between heavy ops. */
+      const checkDeadline = () => {
+        if (Date.now() > deadline) {
+          throw new Error("Processing timed out");
+        }
+      };
 
       // Generate samples
       const reportProgress = (value: number, message: string) => {
+        checkDeadline();
         self.postMessage({ type: "progress", value, message });
       };
 
@@ -35,12 +45,14 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         e.data.lengthMode,
       );
 
+      checkDeadline();
       reportProgress(0.65, "Building ZIP…");
 
       // Encode each sample as a WAV file
       const zipEntries: { name: string; data: Uint8Array }[] = [];
 
       for (let i = 0; i < samples.length; i++) {
+        checkDeadline();
         const s = samples[i];
         const interleaved = interleave(s.channels);
         const wavBuf = encodeWav(interleaved, s.sampleRate, s.channels.length);
@@ -51,6 +63,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         });
       }
 
+      checkDeadline();
       reportProgress(0.85, "Writing manifest…");
 
       // Build manifest
@@ -67,6 +80,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       reportProgress(0.95, "Compressing…");
 
       // Build ZIP
+      checkDeadline();
       const zipBlob = buildZip(zipEntries);
 
       reportProgress(1.0, "Complete!");
