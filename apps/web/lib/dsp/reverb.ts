@@ -356,7 +356,8 @@ export function reverseBloom(
 
 /**
  * Short convolution reverb using an exponential-decay noise impulse response.
- * O(n·k) complexity — use short kernels only.
+ * O(n·k) complexity — falls back to modulatedHall for large inputs
+ * where convolution would exceed the processing deadline.
  */
 export function convolutionSmear(
   channels: Float32Array[],
@@ -372,8 +373,22 @@ export function convolutionSmear(
   const safeDecay = Math.max(0.1, Math.min(4, decayTimeS));
   const safeMix = Math.max(0, Math.min(1, mix));
 
-  // Generate exponential-decay noise IR
+  // Fall back to modulatedHall when input is too large for O(n*k) convolution
+  // to finish within the 120s deadline (~160B operations ≈ 80s at 2B ops/sec).
   const irLen = Math.floor(sampleRate * safeDecay);
+  const estimatedOps = channels[0].length * irLen;
+  if (estimatedOps > 160_000_000_000) {
+    return modulatedHall(channels, sampleRate, {
+      decay: Math.min(0.9, safeDecay * 0.3),
+      damping: dampingHz > 4000 ? 0.3 : 0.6,
+      modulationDepth: 0.002,
+      modulationRate: 0.2,
+      mix: safeMix,
+      size: Math.min(1, safeDecay * 0.4),
+    });
+  }
+
+  // Generate exponential-decay noise IR
   const ir = new Float32Array(irLen);
   for (let i = 0; i < irLen; i++) {
     ir[i] = (Math.random() * 2 - 1) * Math.exp(-(i / irLen) * 4);
