@@ -5,6 +5,7 @@
  */
 
 import type { AudioBufferData } from "./types";
+import { checkAborted } from "./deadline";
 
 // ---------- Biquad filters ----------
 
@@ -23,6 +24,7 @@ abstract class BiquadFilter {
     const out = new Float32Array(input.length);
     const { b0, b1, b2, a1, a2 } = this;
     for (let i = 0; i < input.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const x = input[i];
       const y =
         b0 * x + b1 * this.x1 + b2 * this.x2 - a1 * this.y1 - a2 * this.y2;
@@ -161,6 +163,7 @@ export function softClip(
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
     for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const scaled = ch[i] * gain;
       out[i] = Math.abs(scaled) < 1 / gain ? scaled : Math.tanh(scaled);
     }
@@ -177,8 +180,10 @@ export function bitcrush(
   const levels = 1 << (b - 1);
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++)
+    for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       out[i] = Math.round(ch[i] * levels) / levels;
+    }
     return out;
   });
 }
@@ -191,8 +196,10 @@ export function addNoise(
     const peak = maxAbs(ch);
     const noiseScale = peak > 1e-12 ? peak * amount : 0;
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++)
+    for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       out[i] = ch[i] + (Math.random() * 2 - 1) * noiseScale;
+    }
     return out;
   });
 }
@@ -219,7 +226,10 @@ export function normalizePeak(
   const scale = peak / maxAll;
   return channels.map((ch) => {
     const out = new Float32Array(ch.length);
-    for (let i = 0; i < ch.length; i++) out[i] = ch[i] * scale;
+    for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
+      out[i] = ch[i] * scale;
+    }
     return out;
   });
 }
@@ -302,9 +312,11 @@ export function simpleReverb(
     let result = ch.slice(0, maxLen);
 
     for (const d of delayMs) {
+      checkAborted();
       const delay = Math.floor((sr * d) / 1000);
       const comb = new Float32Array(maxLen);
       for (let i = delay; i < maxLen; i++) {
+        if ((i & 0xFFF) === 0) checkAborted();
         comb[i] = result[i] + feedback * comb[i - delay];
       }
       for (let i = 0; i < maxLen; i++) result[i] += comb[i] * 0.25;
@@ -336,6 +348,7 @@ export function tapeWow(
   return channels.map((ch) => {
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const mod = 1 + depth * Math.sin(2 * Math.PI * rate * i * t);
       const phase = i / mod;
       const idx = Math.floor(phase);
@@ -481,6 +494,7 @@ export function wsolaStretch(
     let outPos = 0;
 
     while (inPos + windowSize <= n && outPos + windowSize <= outLen) {
+      if ((inPos & 0xFFF) === 0) checkAborted();
       for (let i = 0; i < windowSize; i++) {
         out[outPos + i] += ch[inPos + i] * win[i];
         norm[outPos + i] += win[i];
@@ -558,6 +572,7 @@ export function dcBlock(
     let y = 0;
     let x1 = 0;
     for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       y = ch[i] - x1 + R * y;
       x1 = ch[i];
       out[i] = y;
@@ -617,6 +632,7 @@ export function filterSweep(
     const out = new Float32Array(ch.length);
     let y = 0;
     for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const t = i / ch.length;
       const cutoff = startHz + (endHz - startHz) * t;
       const RC = 1 / (2 * Math.PI * Math.max(10, cutoff));
@@ -639,6 +655,7 @@ export function ensureSanitary(
     const out = new Float32Array(ch.length);
     let maxAbs = 0;
     for (let i = 0; i < ch.length; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       let s = ch[i];
       if (!isFinite(s)) s = 0;
       s = Math.max(-1, Math.min(1, s));

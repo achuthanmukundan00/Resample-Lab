@@ -7,6 +7,7 @@
  */
 
 import { normalizePeak } from "./transforms";
+import { checkAborted } from "./deadline";
 
 // ── Dark room reverb ─────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ export function darkRoom(
     const lpfAlpha = 1 - damping;
 
     for (let i = 0; i < len; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const dry = i < ch.length ? ch[i] : 0;
 
       // Comb section
@@ -310,6 +312,7 @@ export function reverseBloom(
     // Process reversed signal through reverb
     const reverbOut = new Float32Array(len);
     for (let i = 0; i < len; i++) {
+      if ((i & 0xFFF) === 0) checkAborted();
       const dry = i < reversed.length ? reversed[i] : 0;
 
       let combSum = 0;
@@ -404,6 +407,7 @@ export function convolutionSmear(
 
     // Convolve
     for (let i = 0; i < ch.length; i++) {
+      if ((i & 0x3FF) === 0) checkAborted();
       const x = ch[i];
       for (let j = 0; j < irLen; j++) {
         conv[i + j] += x * ir[j];

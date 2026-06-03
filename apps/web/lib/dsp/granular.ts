@@ -12,6 +12,7 @@
  */
 
 import { normalizePeak, pitchShiftGrainChannels } from "./transforms";
+import { checkAborted } from "./deadline";
 
 // ── RNG ──────────────────────────────────────────────────────────────
 
@@ -193,6 +194,7 @@ export function granularCloud(
       const w = window[i] || 0;
       const outIdx = outPos + i;
       if (outIdx < outLen) {
+        if ((i & 0x1FF) === 0) checkAborted();
         outLeft[outIdx] += grainLeft[i] * w * leftGain;
         normLeft[outIdx] += w * Math.abs(leftGain);
         if (isStereo) {
@@ -342,6 +344,7 @@ export function grainReverbBloom(
 
     const outPos = g * hopSize;
     for (let i = 0; i < grainSamples && i < gLeft.length; i++) {
+      if ((i & 0x1FF) === 0) checkAborted();
       // Exponential decay envelope from grain onset
       const decayEnv = Math.exp(-i / decaySamples);
       const w = (window[i] || 0) * decayEnv;
@@ -440,6 +443,7 @@ export function granularDelaySwarm(
 
     const outPos = g * hopSize;
     for (let i = 0; i < grainSamples && i < gLeft.length; i++) {
+      if ((i & 0x1FF) === 0) checkAborted();
       const w = window[i] || 0;
       const idx = outPos + i;
       if (idx < outLen) {

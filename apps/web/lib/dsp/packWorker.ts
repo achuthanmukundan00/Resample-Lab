@@ -12,6 +12,7 @@ import {
 import { encodeWav } from "./wav";
 import { interleave } from "./transforms";
 import { buildZip } from "./zip";
+import { setDeadline } from "./deadline";
 
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   if (e.data.type !== "generate") return;
@@ -22,6 +23,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     try {
       const TIMEOUT_MS = 120_000;
       const deadline = Date.now() + TIMEOUT_MS;
+      setDeadline(deadline);
       const packId = `pack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
       /** Check deadline and throw if exceeded. Called between heavy ops. */
