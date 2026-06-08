@@ -372,7 +372,14 @@ export function downsample(
 ): Float32Array[] {
   const f = Math.max(2, Math.round(factor));
   const lpCutoff = sr / (2 * f);
-  let filtered = bandpass(channels, sr, 20, lpCutoff);
+  // Use separate highpass + lowpass instead of a single bandpass to
+  // avoid numerical instability when the passband is extremely wide
+  // (Q < 0.25 causes the biquad to degenerate, attenuating signal by
+  // 400× or more — which makes subsequent bitcrush quantize to zero).
+  let filtered = highpass(channels, sr, 20);
+  if (lpCutoff < sr / 2 - 1) {
+    filtered = lowpass(filtered, sr, lpCutoff);
+  }
 
   const n = channels[0].length;
   return filtered.map((ch) => {

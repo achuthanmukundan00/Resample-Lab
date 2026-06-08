@@ -178,9 +178,19 @@ export function diffusionDelay(
     1,
     Math.min(Math.floor((sampleRate * delayMs) / 1000), channels[0].length),
   );
-  const safeFeedback = Math.max(0, Math.min(0.85, feedback));
   const diffGain = Math.max(0.1, Math.min(0.95, diffusion));
   const allpassStages = Math.max(2, Math.min(6, Math.floor(stages)));
+
+  // Stability guard: the cascaded feedforward-comb-like stages can produce
+  // a peak gain of (1 + diffGain)^allpassStages.  We must keep the total
+  // loop gain (safeFeedback × cascadePeakGain) below 1 to prevent runaway
+  // amplitude that produces NaN/Infinity.
+  const cascadePeakGain = Math.pow(1 + diffGain, allpassStages);
+  const maxStableFeedback = 0.93 / cascadePeakGain;
+  const safeFeedback = Math.max(
+    0,
+    Math.min(Math.min(0.85, feedback), maxStableFeedback),
+  );
 
   // Allpass delay lengths for each stage
   const apDelays: number[] = [];
